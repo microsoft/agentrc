@@ -45,8 +45,8 @@ export async function assertCopilotCliReady(): Promise<CopilotCliConfig> {
   } catch {
     cachedCliConfig = null;
     throw new Error(
-      `Copilot CLI at ${desc} is not compatible with SDK server mode. ` +
-        "Expected support for '--headless'. Install/update the VS Code Copilot Chat CLI or adjust PATH."
+      `Copilot CLI at ${desc} does not support --headless (SDK server mode). ` +
+        "Update the GitHub Copilot Chat extension in VS Code, or run: npm install -g @github/copilot"
     );
   }
 
@@ -73,7 +73,7 @@ export function buildExecArgs(config: CopilotCliConfig, extraArgs: string[]): [s
   return [config.cliPath, extraArgs];
 }
 
-async function findCopilotCliConfig(): Promise<CopilotCliConfig> {
+export async function findCopilotCliConfig(): Promise<CopilotCliConfig> {
   if (cachedCliConfig && Date.now() - cachedCliConfigTimestamp < CLI_CACHE_TTL_MS) {
     logCopilotDebug("using cached CLI config");
     return cachedCliConfig;
@@ -199,9 +199,8 @@ async function findCopilotCliConfig(): Promise<CopilotCliConfig> {
       ? `${first.config.cliPath} ${first.config.cliArgs.join(" ")}`
       : first.config.cliPath;
     throw new Error(
-      `Found Copilot CLI candidate from ${first.source} (${desc}) but it does not support '--headless'. ` +
-        "AgentRC requires a Copilot CLI build compatible with SDK server mode. " +
-        "Install/update GitHub Copilot Chat in VS Code, or point AGENTRC_COPILOT_CLI_PATH to a compatible CLI binary."
+      `Found Copilot CLI from ${first.source} (${desc}) but it does not support --headless. ` +
+        "Update the GitHub Copilot Chat extension in VS Code, or run: npm install -g @github/copilot"
     );
   }
 

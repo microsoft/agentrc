@@ -3,6 +3,7 @@ import { Argument, Command } from "commander";
 import { analyzeCommand } from "./commands/analyze";
 import { batchCommand } from "./commands/batch";
 import { batchReadinessCommand } from "./commands/batchReadiness";
+import { doctorCommand } from "./commands/doctor";
 import { evalCommand } from "./commands/eval";
 import { generateCommand } from "./commands/generate";
 import { initCommand } from "./commands/init";
@@ -36,7 +37,7 @@ export function runCli(argv: string[]): void {
   program
     .name("agentrc")
     .description("Set up repositories for AI-assisted development")
-    .version("1.0.0")
+    .version(process.env.AGENTRC_VERSION ?? "0.0.0-dev")
     .option("--json", "Output machine-readable JSON to stdout")
     .option("--quiet", "Suppress stderr progress output");
 
@@ -149,6 +150,11 @@ export function runCli(argv: string[]): void {
     .option("--output <path>", "Write HTML report to file")
     .option("--policy <sources>", "Policy sources (comma-separated: paths, npm packages)")
     .action(withGlobalOpts(batchReadinessCommand));
+
+  program
+    .command("doctor")
+    .description("Check environment prerequisites (Node.js, git, Copilot CLI, auth)")
+    .action(withGlobalOpts(doctorCommand));
 
   program.parse(argv);
 }
