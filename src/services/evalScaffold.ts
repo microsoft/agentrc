@@ -12,6 +12,7 @@ export type EvalCase = {
   prompt: string;
   expectation: string;
   area?: string;
+  workingDirectory?: string;
 };
 
 export type EvalConfig = {
@@ -85,13 +86,15 @@ export async function generateEvalScaffold(options: EvalScaffoldOptions): Promis
           "This repo has the following areas:",
           ...options.areas.map((a) => {
             const patterns = Array.isArray(a.applyTo) ? a.applyTo.join(", ") : a.applyTo;
-            return `- ${a.name} (${patterns})`;
+            const workDir = a.workingDirectory ? ` [workspace: ${a.workingDirectory}]` : "";
+            return `- ${a.name} (${patterns})${workDir}`;
           }),
           "",
           "Generate a mix of:",
           "- Single-area cases that go deep into one area's internals",
           "- Cross-area cases that test interactions between areas",
-          'Include an optional "area" field in each case to tag which area(s) it targets.'
+          'Include an optional "area" field in each case to tag which area(s) it targets.',
+          'For areas with a workspace (workingDirectory), include a "workingDirectory" field set to that workspace path so evals run scoped to the correct folder.'
         ].join("\n")
       : "";
 
@@ -202,7 +205,11 @@ function normalizeEvalConfig(parsed: EvalConfig, count: number): EvalConfig {
       id,
       prompt: String(entry.prompt ?? "").trim(),
       expectation: String(entry.expectation ?? "").trim(),
-      area: typeof entry.area === "string" && entry.area.trim() ? entry.area.trim() : undefined
+      area: typeof entry.area === "string" && entry.area.trim() ? entry.area.trim() : undefined,
+      workingDirectory:
+        typeof entry.workingDirectory === "string" && entry.workingDirectory.trim()
+          ? entry.workingDirectory.trim()
+          : undefined
     };
   });
 

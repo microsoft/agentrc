@@ -27,6 +27,7 @@ export type Area = {
   scripts?: Record<string, string>;
   hasTsConfig?: boolean;
   parentArea?: string;
+  workingDirectory?: string;
 };
 
 export type RepoAnalysis = {
@@ -905,6 +906,47 @@ async function areasFromFallback(repoPath: string, existingAreas: Area[]): Promi
   return areas;
 }
 
+async function resolveConfigArea(
+  repoPath: string,
+  resolvedRoot: string,
+  ca: AgentrcConfigArea
+): Promise<Area | undefined> {
+  const patterns = Array.isArray(ca.applyTo) ? ca.applyTo : [ca.applyTo];
+  const firstSegment = patterns[0].split("/")[0];
+  const basePath =
+    firstSegment.includes("*") || firstSegment.includes("?")
+      ? repoPath
+      : path.join(repoPath, firstSegment);
+
+  const resolved = path.resolve(basePath);
+  if (resolved !== resolvedRoot && !resolved.startsWith(resolvedRoot + path.sep)) return undefined;
+
+  let scripts: Record<string, string> | undefined;
+  let hasTsConfig: boolean | undefined;
+  try {
+    const children = await safeReadDir(basePath);
+    if (children.includes("package.json")) {
+      const pkg = await readJson(path.join(basePath, "package.json"));
+      const pkgScripts = (pkg?.scripts ?? {}) as Record<string, string>;
+      if (Object.keys(pkgScripts).length > 0) scripts = pkgScripts;
+    }
+    if (children.includes("tsconfig.json")) hasTsConfig = true;
+  } catch {
+    // Directory may not exist yet for config areas
+  }
+
+  return {
+    name: ca.name,
+    description: ca.description,
+    applyTo: ca.applyTo,
+    path: basePath,
+    source: "config" as const,
+    scripts,
+    hasTsConfig,
+    parentArea: ca.parentArea
+  };
+}
+
 async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Area[]> {
   let autoAreas: Area[];
 
@@ -947,50 +989,42 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
     autoAreas = Array.from(byName.values());
   }
 
-  // Merge with config areas
+  // Merge with config areas (flat + workspace)
   const config = await loadAgentrcConfig(repoPath);
-  if (!config?.areas?.length) return autoAreas;
+  if (!config?.areas?.length && !config?.workspaces?.length) return autoAreas;
 
   const resolvedRoot = path.resolve(repoPath);
   const configAreas: Area[] = [];
-  for (const ca of config.areas) {
-    // Derive path: extract leading directory from first applyTo pattern, ignoring glob-only patterns
-    const patterns = Array.isArray(ca.applyTo) ? ca.applyTo : [ca.applyTo];
-    const firstSegment = patterns[0].split("/")[0];
-    const basePath =
-      firstSegment.includes("*") || firstSegment.includes("?")
-        ? repoPath
-        : path.join(repoPath, firstSegment);
 
-    // Prevent path traversal — config areas must stay inside the repo
-    const resolved = path.resolve(basePath);
-    if (resolved !== resolvedRoot && !resolved.startsWith(resolvedRoot + path.sep)) continue;
+  // Process flat config areas
+  for (const ca of config.areas ?? []) {
+    const area = await resolveConfigArea(repoPath, resolvedRoot, ca);
+    if (area) configAreas.push(area);
+  }
 
-    // Enrich config areas with scripts/hasTsConfig
-    let scripts: Record<string, string> | undefined;
-    let hasTsConfig: boolean | undefined;
-    try {
-      const children = await safeReadDir(basePath);
-      if (children.includes("package.json")) {
-        const pkg = await readJson(path.join(basePath, "package.json"));
-        const pkgScripts = (pkg?.scripts ?? {}) as Record<string, string>;
-        if (Object.keys(pkgScripts).length > 0) scripts = pkgScripts;
+  // Process workspace areas — flatten into namespaced Area entries
+  for (const ws of config.workspaces ?? []) {
+    const wsAbsPath = path.resolve(repoPath, ws.path);
+    if (!wsAbsPath.startsWith(resolvedRoot + path.sep) && wsAbsPath !== resolvedRoot) continue;
+
+    for (const ca of ws.areas) {
+      // Resolve applyTo patterns relative to the workspace path
+      const rawPatterns = Array.isArray(ca.applyTo) ? ca.applyTo : [ca.applyTo];
+      const repoRelativePatterns = rawPatterns.map((p) => `${ws.path}/${p}`);
+      const repoRelativeApplyTo =
+        repoRelativePatterns.length === 1 ? repoRelativePatterns[0] : repoRelativePatterns;
+
+      const namespacedArea: AgentrcConfigArea = {
+        ...ca,
+        name: `${ws.name}/${ca.name}`,
+        applyTo: repoRelativeApplyTo
+      };
+      const area = await resolveConfigArea(repoPath, resolvedRoot, namespacedArea);
+      if (area) {
+        area.workingDirectory = ws.path;
+        configAreas.push(area);
       }
-      if (children.includes("tsconfig.json")) hasTsConfig = true;
-    } catch {
-      // Directory may not exist yet for config areas
     }
-
-    configAreas.push({
-      name: ca.name,
-      description: ca.description,
-      applyTo: ca.applyTo,
-      path: basePath,
-      source: "config" as const,
-      scripts,
-      hasTsConfig,
-      parentArea: ca.parentArea
-    });
   }
 
   // Config areas override auto-detected by name (case-insensitive)
@@ -1000,6 +1034,146 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
   }
 
   return Array.from(autoByName.values());
+}
+
+// ─── Workspace detection ───
+
+const WORKSPACE_SCAN_MAX_DEPTH = 3;
+const WORKSPACE_SKIP_DIRS = new Set([
+  "node_modules",
+  ".git",
+  ".hg",
+  "target",
+  "build",
+  "dist",
+  "out",
+  "vendor",
+  "coverage",
+  "__pycache__",
+  ".cache"
+]);
+
+/**
+ * Detect workspaces by scanning for `.vscode` folders (indicating directories
+ * that developers open as VS Code workspaces) and by grouping auto-detected
+ * areas that share a common parent directory.
+ */
+export async function detectWorkspaces(
+  repoPath: string,
+  areas: Area[]
+): Promise<AgentrcConfigWorkspace[]> {
+  const resolvedRoot = path.resolve(repoPath);
+  const workspaces = new Map<string, AgentrcConfigWorkspace>();
+
+  // Strategy 1: Scan for .vscode folders as workspace markers
+  const vscodeDirs = await findVSCodeDirs(repoPath, repoPath, WORKSPACE_SCAN_MAX_DEPTH);
+  for (const vsDir of vscodeDirs) {
+    // The workspace is the parent of the .vscode folder
+    const wsAbs = path.dirname(vsDir);
+    const wsRel = path.relative(repoPath, wsAbs).replace(/\\/gu, "/");
+    if (!wsRel || wsRel === ".") continue; // skip repo root
+
+    const wsResolved = path.resolve(wsAbs);
+    if (!wsResolved.startsWith(resolvedRoot + path.sep)) continue;
+
+    // Find areas that fall within this workspace
+    const wsAreas = areasWithinDir(wsRel, areas);
+    if (wsAreas.length === 0) {
+      // Run heuristic detection scoped to this workspace directory
+      const scopedAreas = await areasFromHeuristics(wsAbs);
+      if (scopedAreas.length === 0) continue;
+      const configAreas = scopedAreas.map((a) => ({
+        name: a.name,
+        applyTo: Array.isArray(a.applyTo) ? a.applyTo : a.applyTo,
+        description: a.description
+      }));
+      workspaces.set(wsRel, { name: path.basename(wsRel), path: wsRel, areas: configAreas });
+    } else {
+      const configAreas = wsAreas.map((a) => toWorkspaceRelativeArea(wsRel, a));
+      workspaces.set(wsRel, { name: path.basename(wsRel), path: wsRel, areas: configAreas });
+    }
+  }
+
+  // Strategy 2: Group areas by common parent directory (2+ siblings → workspace)
+  const parentGroups = new Map<string, Area[]>();
+  for (const area of areas) {
+    if (!area.path) continue;
+    const rel = path.relative(repoPath, area.path).replace(/\\/gu, "/");
+    const segments = rel.split("/");
+    if (segments.length < 2) continue; // top-level dir — not a nested workspace
+
+    const parentRel = segments.slice(0, -1).join("/");
+    if (workspaces.has(parentRel)) continue; // already found via .vscode
+
+    if (!parentGroups.has(parentRel)) parentGroups.set(parentRel, []);
+    parentGroups.get(parentRel)!.push(area);
+  }
+
+  for (const [parentRel, grouped] of parentGroups) {
+    if (grouped.length < 2) continue;
+
+    const parentAbs = path.resolve(repoPath, parentRel);
+    const parentResolved = path.resolve(parentAbs);
+    if (!parentResolved.startsWith(resolvedRoot + path.sep)) continue;
+
+    const configAreas = grouped.map((a) => toWorkspaceRelativeArea(parentRel, a));
+    workspaces.set(parentRel, {
+      name: path.basename(parentRel),
+      path: parentRel,
+      areas: configAreas
+    });
+  }
+
+  return Array.from(workspaces.values());
+}
+
+async function findVSCodeDirs(
+  repoPath: string,
+  dir: string,
+  maxDepth: number,
+  depth = 0
+): Promise<string[]> {
+  if (depth >= maxDepth) return [];
+  const results: string[] = [];
+  let entries: string[];
+  try {
+    entries = await safeReadDir(dir);
+  } catch {
+    return [];
+  }
+
+  for (const entry of entries) {
+    if (entry === ".vscode") {
+      results.push(path.join(dir, entry));
+      continue;
+    }
+    if (entry.startsWith(".") || WORKSPACE_SKIP_DIRS.has(entry)) continue;
+    const fullPath = path.join(dir, entry);
+    if (await isScannableDirectory(repoPath, fullPath)) {
+      results.push(...(await findVSCodeDirs(repoPath, fullPath, maxDepth, depth + 1)));
+    }
+  }
+
+  return results;
+}
+
+function areasWithinDir(wsRel: string, areas: Area[]): Area[] {
+  const prefix = wsRel + "/";
+  return areas.filter((a) => {
+    const patterns = Array.isArray(a.applyTo) ? a.applyTo : [a.applyTo];
+    return patterns.some((p) => p.startsWith(prefix));
+  });
+}
+
+function toWorkspaceRelativeArea(wsRel: string, area: Area): AgentrcConfigArea {
+  const prefix = wsRel + "/";
+  const patterns = Array.isArray(area.applyTo) ? area.applyTo : [area.applyTo];
+  const relPatterns = patterns.map((p) => (p.startsWith(prefix) ? p.slice(prefix.length) : p));
+  return {
+    name: area.name,
+    applyTo: relPatterns.length === 1 ? relPatterns[0] : relPatterns,
+    description: area.description
+  };
 }
 
 // ─── AgentRC config ───
@@ -1013,13 +1187,59 @@ export type AgentrcConfigArea = {
   parentArea?: string;
 };
 
+export type AgentrcConfigWorkspace = {
+  name: string;
+  path: string;
+  areas: AgentrcConfigArea[];
+};
+
 export type AgentrcConfig = {
   areas?: AgentrcConfigArea[];
+  workspaces?: AgentrcConfigWorkspace[];
   policies?: string[];
   strategy?: InstructionStrategy;
   detailDir?: string;
   claudeMd?: boolean;
 };
+
+function parseConfigAreas(raw: unknown): AgentrcConfigArea[] {
+  if (!Array.isArray(raw)) return [];
+  const areas: AgentrcConfigArea[] = [];
+  for (const entry of raw) {
+    if (
+      typeof entry !== "object" ||
+      entry === null ||
+      typeof (entry as Record<string, unknown>).name !== "string" ||
+      (entry as Record<string, unknown>).applyTo === undefined
+    )
+      continue;
+    const e = entry as Record<string, unknown>;
+    if (!(e.name as string).trim()) continue;
+    const rawApplyTo = e.applyTo;
+    let applyTo: string | string[];
+    if (typeof rawApplyTo === "string") {
+      applyTo = rawApplyTo;
+    } else if (Array.isArray(rawApplyTo) && rawApplyTo.every((v) => typeof v === "string")) {
+      applyTo = rawApplyTo as string[];
+    } else {
+      continue;
+    }
+    if (
+      (typeof applyTo === "string" && !applyTo.trim()) ||
+      (Array.isArray(applyTo) && applyTo.length === 0)
+    )
+      continue;
+    const allPatterns = Array.isArray(applyTo) ? applyTo : [applyTo];
+    if (allPatterns.some((p) => p.split("/").includes(".."))) continue;
+    areas.push({
+      name: e.name as string,
+      applyTo,
+      description: typeof e.description === "string" ? e.description : undefined,
+      parentArea: typeof e.parentArea === "string" ? e.parentArea : undefined
+    });
+  }
+  return areas;
+}
 
 export async function loadAgentrcConfig(repoPath: string): Promise<AgentrcConfig | undefined> {
   // Try repo root first, then .github/
@@ -1036,44 +1256,7 @@ export async function loadAgentrcConfig(repoPath: string): Promise<AgentrcConfig
     if (json.areas !== undefined && !Array.isArray(json.areas)) {
       return undefined;
     }
-    const areas: AgentrcConfigArea[] = [];
-    if (Array.isArray(json.areas)) {
-      for (const entry of json.areas) {
-        if (
-          typeof entry === "object" &&
-          entry !== null &&
-          typeof (entry as Record<string, unknown>).name === "string" &&
-          (entry as Record<string, unknown>).applyTo !== undefined
-        ) {
-          const e = entry as Record<string, unknown>;
-          if (!(e.name as string).trim()) continue;
-          const rawApplyTo = e.applyTo;
-          // Validate applyTo is a string or array of strings
-          let applyTo: string | string[];
-          if (typeof rawApplyTo === "string") {
-            applyTo = rawApplyTo;
-          } else if (Array.isArray(rawApplyTo) && rawApplyTo.every((v) => typeof v === "string")) {
-            applyTo = rawApplyTo as string[];
-          } else {
-            continue;
-          }
-          if (
-            (typeof applyTo === "string" && !applyTo.trim()) ||
-            (Array.isArray(applyTo) && applyTo.length === 0)
-          )
-            continue;
-          // Reject patterns with path traversal segments
-          const allPatterns = Array.isArray(applyTo) ? applyTo : [applyTo];
-          if (allPatterns.some((p) => p.split("/").includes(".."))) continue;
-          areas.push({
-            name: e.name as string,
-            applyTo,
-            description: typeof e.description === "string" ? e.description : undefined,
-            parentArea: typeof e.parentArea === "string" ? e.parentArea : undefined
-          });
-        }
-      }
-    }
+    const areas = parseConfigAreas(json.areas);
 
     // Parse policies array
     let policies: string[] | undefined;
@@ -1094,7 +1277,7 @@ export async function loadAgentrcConfig(repoPath: string): Promise<AgentrcConfig
     let detailDir: string | undefined;
     if (typeof json.detailDir === "string") {
       // Normalize separators so validation works on both Windows and POSIX
-      const dir = (json.detailDir as string).trim().replace(/\\+/g, "/");
+      const dir = (json.detailDir as string).trim().replace(/\\+/gu, "/");
       const blocklist = new Set([".git", "node_modules", ".github", "dist", "build"]);
       // Must be a single path segment — no slashes, no traversal, not in blocklist
       if (
@@ -1111,9 +1294,37 @@ export async function loadAgentrcConfig(repoPath: string): Promise<AgentrcConfig
     // Parse claudeMd
     const claudeMd = json.claudeMd === true ? true : undefined;
 
-    // Validate parentArea references
-    const areaNames = new Set(areas.map((a) => a.name.toLowerCase()));
-    for (const area of areas) {
+    // Parse workspaces array
+    const workspaces: AgentrcConfigWorkspace[] = [];
+    if (Array.isArray(json.workspaces)) {
+      for (const ws of json.workspaces) {
+        if (typeof ws !== "object" || ws === null) continue;
+        const w = ws as Record<string, unknown>;
+        if (typeof w.name !== "string" || !(w.name as string).trim()) continue;
+        if (typeof w.path !== "string" || !(w.path as string).trim()) continue;
+
+        const wsPath = (w.path as string).replace(/\\+/gu, "/");
+        // Must be relative, no traversal, no absolute path, no root
+        if (path.isAbsolute(wsPath) || wsPath === "." || wsPath.split("/").includes("..")) continue;
+
+        const wsAreas = parseConfigAreas(w.areas);
+        if (wsAreas.length === 0) continue;
+
+        workspaces.push({
+          name: (w.name as string).trim(),
+          path: wsPath,
+          areas: wsAreas
+        });
+      }
+    }
+
+    // Validate parentArea references across all areas (flat + workspace)
+    const allConfigAreas = [...areas];
+    for (const ws of workspaces) {
+      allConfigAreas.push(...ws.areas);
+    }
+    const areaNames = new Set(allConfigAreas.map((a) => a.name.toLowerCase()));
+    for (const area of allConfigAreas) {
       if (area.parentArea && !areaNames.has(area.parentArea.toLowerCase())) {
         area.parentArea = undefined;
       }
@@ -1121,6 +1332,7 @@ export async function loadAgentrcConfig(repoPath: string): Promise<AgentrcConfig
 
     return {
       areas,
+      workspaces: workspaces.length ? workspaces : undefined,
       policies: policies?.length ? policies : undefined,
       strategy,
       detailDir,

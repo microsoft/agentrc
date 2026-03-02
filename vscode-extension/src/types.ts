@@ -1,7 +1,12 @@
 /**
  * Re-export AgentRC CLI types for use in the extension.
  */
-export type { RepoAnalysis } from "agentrc/services/analyzer.js";
+export type {
+  RepoAnalysis,
+  AgentrcConfig,
+  AgentrcConfigWorkspace,
+  AgentrcConfigArea
+} from "agentrc/services/analyzer.js";
 
 export type {
   ReadinessReport,

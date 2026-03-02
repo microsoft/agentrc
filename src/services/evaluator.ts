@@ -109,12 +109,26 @@ export async function runEval(
       const prompt = buildPrompt(options.repoPath, testCase.prompt);
       const caseStartedAt = Date.now();
 
+      // Resolve working directory: per-case override (from workspace config) or repo root
+      let caseWorkingDir: string | undefined;
+      if (testCase.workingDirectory) {
+        const resolved = path.resolve(options.repoPath, testCase.workingDirectory);
+        const root = path.resolve(options.repoPath);
+        if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+          throw new Error(
+            `Invalid workingDirectory "${testCase.workingDirectory}": escapes repo boundary`
+          );
+        }
+        caseWorkingDir = resolved;
+      }
+
       progress(`Running eval ${index + 1}/${total}: ${id} (without instructions)...`);
       const withoutResult = await askOnce(client, {
         prompt,
         model: options.model,
         systemMessage: baseSystemMessage,
-        phase: "withoutInstructions"
+        phase: "withoutInstructions",
+        workingDirectory: caseWorkingDir
       });
 
       progress(`Running eval ${index + 1}/${total}: ${id} (with instructions)...`);
@@ -122,7 +136,8 @@ export async function runEval(
         prompt,
         model: options.model,
         systemMessage: [baseSystemMessage, instructionText].filter(Boolean).join("\n\n"),
-        phase: "withInstructions"
+        phase: "withInstructions",
+        workingDirectory: caseWorkingDir
       });
 
       progress(`Running eval ${index + 1}/${total}: ${id} (judging)...`);
@@ -197,6 +212,7 @@ type AskOptions = {
   model: string;
   systemMessage?: string;
   phase: EvalPhase;
+  workingDirectory?: string;
 };
 
 type AskResult = {
@@ -210,7 +226,8 @@ async function askOnce(client: CopilotClient, options: AskOptions): Promise<AskR
     model: options.model,
     streaming: true,
     infiniteSessions: { enabled: false },
-    systemMessage: options.systemMessage ? { content: options.systemMessage } : undefined
+    systemMessage: options.systemMessage ? { content: options.systemMessage } : undefined,
+    ...(options.workingDirectory ? { workingDirectory: options.workingDirectory } : {})
   });
 
   let content = "";

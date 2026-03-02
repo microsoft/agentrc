@@ -1,4 +1,4 @@
-export { analyzeRepo, loadAgentrcConfig } from "agentrc/services/analyzer.js";
+export { analyzeRepo, loadAgentrcConfig, detectWorkspaces } from "agentrc/services/analyzer.js";
 export { generateConfigs } from "agentrc/services/generator.js";
 export {
   generateCopilotInstructions,

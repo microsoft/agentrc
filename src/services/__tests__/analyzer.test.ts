@@ -4,7 +4,13 @@ import path from "path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { analyzeRepo, loadAgentrcConfig, sanitizeAreaName, type Area } from "../analyzer";
+import {
+  analyzeRepo,
+  loadAgentrcConfig,
+  sanitizeAreaName,
+  detectWorkspaces,
+  type Area
+} from "../analyzer";
 import {
   buildAreaFrontmatter,
   buildAreaInstructionContent,
@@ -1229,5 +1235,373 @@ describe("writeAreaInstruction", () => {
     const content = await fs.readFile(result.filePath, "utf8");
     expect(content).toContain("# Updated");
     expect(content).not.toContain("# Original");
+  });
+});
+
+describe("loadAgentrcConfig workspaces", () => {
+  const tmpDirs: string[] = [];
+
+  async function makeTmpDir(): Promise<string> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "agentrc-ws-"));
+    tmpDirs.push(dir);
+    return dir;
+  }
+
+  afterEach(async () => {
+    for (const dir of tmpDirs) {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+    tmpDirs.length = 0;
+  });
+
+  it("parses workspaces with areas", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        workspaces: [
+          {
+            name: "frontend",
+            path: "packages/frontend",
+            areas: [
+              { name: "app", applyTo: "app/**" },
+              { name: "shared", applyTo: ["shared/**", "common/**"], description: "Shared libs" }
+            ]
+          }
+        ]
+      })
+    );
+    const config = await loadAgentrcConfig(repoPath);
+    expect(config?.workspaces).toHaveLength(1);
+    expect(config?.workspaces?.[0].name).toBe("frontend");
+    expect(config?.workspaces?.[0].path).toBe("packages/frontend");
+    expect(config?.workspaces?.[0].areas).toHaveLength(2);
+    expect(config?.workspaces?.[0].areas[1].description).toBe("Shared libs");
+  });
+
+  it("rejects workspaces with path traversal", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        workspaces: [
+          {
+            name: "evil",
+            path: "../outside",
+            areas: [{ name: "x", applyTo: "x/**" }]
+          }
+        ]
+      })
+    );
+    const config = await loadAgentrcConfig(repoPath);
+    expect(config?.workspaces).toBeUndefined();
+  });
+
+  it("rejects workspaces with absolute path", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        workspaces: [
+          {
+            name: "evil",
+            path: "/tmp/bad",
+            areas: [{ name: "x", applyTo: "x/**" }]
+          }
+        ]
+      })
+    );
+    const config = await loadAgentrcConfig(repoPath);
+    expect(config?.workspaces).toBeUndefined();
+  });
+
+  it("skips workspaces with no valid areas", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        workspaces: [
+          {
+            name: "empty",
+            path: "packages/empty",
+            areas: []
+          }
+        ]
+      })
+    );
+    const config = await loadAgentrcConfig(repoPath);
+    expect(config?.workspaces).toBeUndefined();
+  });
+
+  it("coexists flat areas and workspaces", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        areas: [{ name: "docs", applyTo: "docs/**" }],
+        workspaces: [
+          {
+            name: "frontend",
+            path: "packages/frontend",
+            areas: [{ name: "app", applyTo: "app/**" }]
+          }
+        ]
+      })
+    );
+    const config = await loadAgentrcConfig(repoPath);
+    expect(config?.areas).toHaveLength(1);
+    expect(config?.workspaces).toHaveLength(1);
+  });
+
+  it("rejects workspace with path '.'", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        workspaces: [
+          {
+            name: "root",
+            path: ".",
+            areas: [{ name: "x", applyTo: "x/**" }]
+          }
+        ]
+      })
+    );
+    const config = await loadAgentrcConfig(repoPath);
+    expect(config?.workspaces).toBeUndefined();
+  });
+
+  it("parses workspace with non-existent directory path", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        workspaces: [
+          {
+            name: "future",
+            path: "packages/not-yet-created",
+            areas: [{ name: "app", applyTo: "app/**" }]
+          }
+        ]
+      })
+    );
+    const config = await loadAgentrcConfig(repoPath);
+    expect(config?.workspaces).toHaveLength(1);
+    expect(config?.workspaces?.[0].name).toBe("future");
+  });
+
+  it("skips malformed workspace entries", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        workspaces: [
+          null,
+          "not-an-object",
+          { path: "no-name", areas: [{ name: "x", applyTo: "x/**" }] },
+          { name: "no-path", areas: [{ name: "x", applyTo: "x/**" }] },
+          { name: "  ", path: "blank-name", areas: [{ name: "x", applyTo: "x/**" }] },
+          {
+            name: "valid",
+            path: "packages/valid",
+            areas: [{ name: "app", applyTo: "app/**" }]
+          }
+        ]
+      })
+    );
+    const config = await loadAgentrcConfig(repoPath);
+    expect(config?.workspaces).toHaveLength(1);
+    expect(config?.workspaces?.[0].name).toBe("valid");
+  });
+
+  it("rejects workspace area applyTo with traversal", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        workspaces: [
+          {
+            name: "ws",
+            path: "packages/ws",
+            areas: [{ name: "escape", applyTo: "../../etc/**" }]
+          }
+        ]
+      })
+    );
+    const config = await loadAgentrcConfig(repoPath);
+    // Area is rejected by parseConfigAreas, so workspace has no valid areas → dropped
+    expect(config?.workspaces).toBeUndefined();
+  });
+});
+
+describe("detectWorkspaces", () => {
+  const tmpDirs: string[] = [];
+
+  async function makeTmpDir(): Promise<string> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "agentrc-dw-"));
+    tmpDirs.push(dir);
+    return dir;
+  }
+
+  afterEach(async () => {
+    for (const dir of tmpDirs) {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+    tmpDirs.length = 0;
+  });
+
+  it("detects workspace via .vscode folder", async () => {
+    const repoPath = await makeTmpDir();
+    // Create a subdirectory with a .vscode folder and a heuristic area inside it
+    await fs.mkdir(path.join(repoPath, "packages", "frontend", ".vscode"), { recursive: true });
+    await fs.mkdir(path.join(repoPath, "packages", "frontend", "app"), { recursive: true });
+    await fs.writeFile(
+      path.join(repoPath, "packages", "frontend", "app", "index.ts"),
+      "export {};"
+    );
+
+    const areas: Area[] = [];
+    const workspaces = await detectWorkspaces(repoPath, areas);
+    expect(workspaces).toHaveLength(1);
+    const ws = workspaces.find((w) => w.path === "packages/frontend");
+    expect(ws).toBeDefined();
+    expect(ws!.name).toBe("frontend");
+  });
+
+  it("groups sibling areas into workspace by common parent", async () => {
+    const repoPath = await makeTmpDir();
+    const appPath = path.join(repoPath, "packages", "web", "app");
+    const sharedPath = path.join(repoPath, "packages", "web", "shared");
+    await fs.mkdir(appPath, { recursive: true });
+    await fs.mkdir(sharedPath, { recursive: true });
+
+    const areas: Area[] = [
+      { name: "app", applyTo: "packages/web/app/**", path: appPath, source: "auto" },
+      { name: "shared", applyTo: "packages/web/shared/**", path: sharedPath, source: "auto" }
+    ];
+
+    const workspaces = await detectWorkspaces(repoPath, areas);
+    const ws = workspaces.find((w) => w.path === "packages/web");
+    expect(ws).toBeDefined();
+    expect(ws!.areas).toHaveLength(2);
+  });
+
+  it("converts area applyTo to workspace-relative patterns", async () => {
+    const repoPath = await makeTmpDir();
+    const appPath = path.join(repoPath, "mono", "app");
+    const libPath = path.join(repoPath, "mono", "lib");
+    await fs.mkdir(appPath, { recursive: true });
+    await fs.mkdir(libPath, { recursive: true });
+
+    const areas: Area[] = [
+      { name: "app", applyTo: "mono/app/**", path: appPath, source: "auto" },
+      { name: "lib", applyTo: "mono/lib/**", path: libPath, source: "auto" }
+    ];
+
+    const workspaces = await detectWorkspaces(repoPath, areas);
+    const ws = workspaces.find((w) => w.path === "mono");
+    expect(ws).toBeDefined();
+    // applyTo should be workspace-relative
+    const appArea = ws!.areas.find((a) => a.name === "app");
+    expect(appArea?.applyTo).toBe("app/**");
+  });
+
+  it("skips repo root as workspace", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.mkdir(path.join(repoPath, ".vscode"), { recursive: true });
+
+    const areas: Area[] = [];
+    const workspaces = await detectWorkspaces(repoPath, areas);
+    // Root .vscode should not create a workspace entry
+    expect(workspaces.filter((w) => w.path === "" || w.path === ".")).toHaveLength(0);
+  });
+
+  it("does not create workspace for single area in parent", async () => {
+    const repoPath = await makeTmpDir();
+    const appPath = path.join(repoPath, "packages", "solo");
+    await fs.mkdir(appPath, { recursive: true });
+
+    const areas: Area[] = [
+      { name: "solo", applyTo: "packages/solo/**", path: appPath, source: "auto" }
+    ];
+
+    const workspaces = await detectWorkspaces(repoPath, areas);
+    // Single area should not form a workspace from common-parent grouping
+    expect(workspaces.filter((w) => w.path === "packages")).toHaveLength(0);
+  });
+});
+
+describe("analyzeRepo with workspace config", () => {
+  const tmpDirs: string[] = [];
+
+  async function makeTmpDir(): Promise<string> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "agentrc-wsarea-"));
+    tmpDirs.push(dir);
+    return dir;
+  }
+
+  afterEach(async () => {
+    for (const dir of tmpDirs) {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+    tmpDirs.length = 0;
+  });
+
+  it("flattens workspace areas with namespaced names and repo-relative applyTo", async () => {
+    const repoPath = await makeTmpDir();
+    // Minimal repo structure
+    await fs.writeFile(path.join(repoPath, "package.json"), JSON.stringify({ name: "mono" }));
+    await fs.mkdir(path.join(repoPath, "packages", "frontend", "app"), { recursive: true });
+    await fs.writeFile(
+      path.join(repoPath, "packages", "frontend", "app", "index.ts"),
+      "export {};"
+    );
+
+    // agentrc config with workspaces
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        workspaces: [
+          {
+            name: "frontend",
+            path: "packages/frontend",
+            areas: [{ name: "app", applyTo: "app/**" }]
+          }
+        ]
+      })
+    );
+
+    const result = await analyzeRepo(repoPath);
+    const wsArea = result.areas?.find((a) => a.name === "frontend/app");
+    expect(wsArea).toBeDefined();
+    expect(wsArea!.applyTo).toBe("packages/frontend/app/**");
+    expect(wsArea!.workingDirectory).toBe("packages/frontend");
+    expect(wsArea!.source).toBe("config");
+  });
+
+  it("rewrites array applyTo patterns to repo-relative", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(path.join(repoPath, "package.json"), JSON.stringify({ name: "mono" }));
+    await fs.mkdir(path.join(repoPath, "packages", "ui", "app"), { recursive: true });
+    await fs.writeFile(path.join(repoPath, "packages", "ui", "app", "index.ts"), "export {};");
+
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        workspaces: [
+          {
+            name: "ui",
+            path: "packages/ui",
+            areas: [{ name: "app", applyTo: ["app/**", "components/**"] }]
+          }
+        ]
+      })
+    );
+
+    const result = await analyzeRepo(repoPath);
+    const wsArea = result.areas?.find((a) => a.name === "ui/app");
+    expect(wsArea).toBeDefined();
+    expect(wsArea!.applyTo).toEqual(["packages/ui/app/**", "packages/ui/components/**"]);
+    expect(wsArea!.workingDirectory).toBe("packages/ui");
   });
 });

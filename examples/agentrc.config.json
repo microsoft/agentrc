@@ -1,0 +1,42 @@
+{
+  "areas": [
+    {
+      "name": "docs",
+      "applyTo": "docs/**",
+      "description": "Documentation and guides"
+    }
+  ],
+  "workspaces": [
+    {
+      "name": "frontend",
+      "path": "packages/frontend",
+      "areas": [
+        {
+          "name": "app",
+          "applyTo": "app/**"
+        },
+        {
+          "name": "shared",
+          "applyTo": ["shared/**", "common/**"],
+          "description": "Shared libraries"
+        }
+      ]
+    },
+    {
+      "name": "backend",
+      "path": "packages/backend",
+      "areas": [
+        {
+          "name": "api",
+          "applyTo": "src/api/**"
+        },
+        {
+          "name": "workers",
+          "applyTo": "src/workers/**",
+          "parentArea": "api"
+        }
+      ]
+    }
+  ],
+  "policies": ["./policies/strict.json"]
+}

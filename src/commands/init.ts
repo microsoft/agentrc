@@ -2,7 +2,8 @@ import path from "path";
 
 import { checkbox, select } from "@inquirer/prompts";
 
-import { analyzeRepo } from "../services/analyzer";
+import { analyzeRepo, detectWorkspaces } from "../services/analyzer";
+import type { AgentrcConfig, AgentrcConfigArea } from "../services/analyzer";
 import type { AzureDevOpsOrg, AzureDevOpsProject, AzureDevOpsRepo } from "../services/azureDevops";
 import {
   getAzureDevOpsToken,
@@ -225,6 +226,42 @@ export async function initCommand(
     return;
   }
   allFiles.push(...genResult.files);
+
+  // Bootstrap agentrc.config.json with detected workspaces and standalone areas
+  if (analysis.areas && analysis.areas.length > 0) {
+    const configPath = path.join(repoPath, "agentrc.config.json");
+    const workspaces = await detectWorkspaces(repoPath, analysis.areas);
+
+    // Areas already claimed by a workspace (match by path prefix, not name)
+    const workspacePaths = workspaces.map((ws) => ws.path + "/");
+
+    // Standalone areas not inside any workspace
+    const standaloneAreas: AgentrcConfigArea[] = analysis.areas
+      .filter((a) => {
+        if (!a.path) return true;
+        const rel = path.relative(repoPath, a.path).replace(/\\/gu, "/");
+        return !workspacePaths.some((prefix) => rel.startsWith(prefix));
+      })
+      .map((a) => ({
+        name: a.name,
+        applyTo: a.applyTo,
+        ...(a.description ? { description: a.description } : {})
+      }));
+
+    const agentrcConfig: AgentrcConfig = {};
+    if (workspaces.length > 0) agentrcConfig.workspaces = workspaces;
+    if (standaloneAreas.length > 0) agentrcConfig.areas = standaloneAreas;
+
+    if (agentrcConfig.workspaces || agentrcConfig.areas) {
+      const configContent = JSON.stringify(agentrcConfig, null, 2) + "\n";
+      const { wrote } = await safeWriteFile(configPath, configContent, Boolean(options.force));
+      const rel = path.relative(process.cwd(), configPath);
+      allFiles.push({ path: rel, action: wrote ? "wrote" : "skipped" });
+      if (shouldLog(options)) {
+        process.stderr.write((wrote ? `Wrote ${rel}` : `Skipped ${rel} (exists)`) + "\n");
+      }
+    }
+  }
 
   if (options.json) {
     const { ok, status } = deriveFileStatus(allFiles);

@@ -141,7 +141,7 @@ agentrc tui
 
 ### `agentrc init` — Guided Setup
 
-Interactive or headless repo onboarding — detects your stack and walks through readiness, instructions, and config generation.
+Interactive or headless repo onboarding — detects your stack and walks through readiness, instructions, and config generation. For monorepos, auto-detects workspaces and bootstraps `agentrc.config.json` with workspace and area definitions.
 
 ### Global Options
 
@@ -173,6 +173,31 @@ agentrc readiness --policy ./examples/policies/strict.json,./my-overrides.json  
 ```
 
 Policies can also be set in `agentrc.config.json` (`{ "policies": ["./my-policy.json"] }`).
+
+### Configuration File
+
+`agentrc.config.json` (repo root or `.github/`) configures areas, workspaces, and policies:
+
+```json
+{
+  "areas": [{ "name": "docs", "applyTo": "docs/**" }],
+  "workspaces": [
+    {
+      "name": "frontend",
+      "path": "packages/frontend",
+      "areas": [
+        { "name": "app", "applyTo": "app/**" },
+        { "name": "shared", "applyTo": ["shared/**", "common/**"] }
+      ]
+    }
+  ],
+  "policies": ["./policies/strict.json"]
+}
+```
+
+- **`areas`** — standalone areas with glob patterns (relative to repo root)
+- **`workspaces`** — monorepo sub-projects; each workspace groups areas scoped to a subdirectory. Area `applyTo` patterns are relative to the workspace path. Workspace areas get namespaced names (`frontend/app`) and a `workingDirectory` for scoped eval sessions.
+- `agentrc init` auto-detects workspaces (via `.vscode` folders and sibling-area grouping) and bootstraps this file.
 
 > **Security:** Config-sourced policies are restricted to JSON files only — JS/TS module policies must be passed via `--policy`.
 

@@ -162,6 +162,8 @@ In `agentrc.config.json`:
 }
 ```
 
+The config file also supports `areas` and `workspaces` for monorepo configuration — see [examples/agentrc.config.json](../examples/agentrc.config.json) for a full example.
+
 Config-sourced policies are restricted to JSON-only for security.
 
 ## Scoring

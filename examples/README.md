@@ -23,3 +23,7 @@ agentrc eval agentrc.eval.json --repo /path/to/repo
 ## Sample eval config
 
 See `agentrc.eval.json` for a starter eval config you can customize.
+
+## Sample project config
+
+See `agentrc.config.json` for an example monorepo configuration with workspaces, areas, and policies.
