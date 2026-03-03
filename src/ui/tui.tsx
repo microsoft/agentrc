@@ -156,6 +156,16 @@ function Divider({
 
 const PREFERRED_MODELS = ["claude-sonnet-4.5", "claude-sonnet-4", "gpt-4.1", "gpt-5"];
 
+const STATUS_LABELS: Partial<Record<Status, string>> = {
+  intro: "starting",
+  idle: "ready",
+  bootstrapEvalCount: "input",
+  bootstrapEvalConfirm: "confirm",
+  "eval-pick": "eval",
+  "batch-pick": "batch",
+  "model-pick": "models"
+};
+
 function pickBestModel(available: string[], fallback: string): string {
   for (const preferred of PREFERRED_MODELS) {
     if (available.includes(preferred)) return preferred;
@@ -846,46 +856,31 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
     { isActive: inputActive }
   );
 
-  const statusIcon =
-    status === "error"
-      ? accessible
-        ? "ERROR"
-        : "✗"
-      : status === "done"
-        ? accessible
-          ? "OK"
-          : "✓"
-        : isLoading
-          ? spinner
-          : accessible
-            ? "*"
-            : "●";
-  const statusLabel =
-    status === "intro"
-      ? "starting"
-      : status === "idle"
-        ? "ready"
-        : status === "bootstrapEvalCount"
-          ? "input"
-          : status === "bootstrapEvalConfirm"
-            ? "confirm"
-            : status === "eval-pick"
-              ? "eval"
-              : status === "batch-pick"
-                ? "batch"
-                : status === "model-pick"
-                  ? "models"
-                  : status;
-  const statusColor =
-    status === "error"
-      ? "red"
-      : status === "done"
-        ? "green"
-        : isLoading
-          ? "yellow"
-          : isMenu
-            ? "magentaBright"
-            : "cyanBright";
+  let statusIcon: string;
+  if (status === "error") {
+    statusIcon = accessible ? "ERROR" : "✗";
+  } else if (status === "done") {
+    statusIcon = accessible ? "OK" : "✓";
+  } else if (isLoading) {
+    statusIcon = spinner;
+  } else {
+    statusIcon = accessible ? "*" : "●";
+  }
+
+  const statusLabel = STATUS_LABELS[status] ?? status;
+
+  let statusColor: string;
+  if (status === "error") {
+    statusColor = "red";
+  } else if (status === "done") {
+    statusColor = "green";
+  } else if (isLoading) {
+    statusColor = "yellow";
+  } else if (isMenu) {
+    statusColor = "magentaBright";
+  } else {
+    statusColor = "cyanBright";
+  }
 
   const formatTokens = (result: EvalResult): string => {
     const withUsage = result.metrics?.withInstructions?.tokenUsage;
