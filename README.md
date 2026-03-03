@@ -145,7 +145,15 @@ Interactive or headless repo onboarding — detects your stack and walks through
 
 ### Global Options
 
-All commands support `--json` (structured JSON to stdout) and `--quiet` (suppress stderr). JSON output uses a `CommandResult<T>` envelope:
+All commands support the following global flags:
+
+| Flag | Description |
+| --- | --- |
+| `--json` | Output structured JSON to stdout. Uses a `CommandResult<T>` envelope (see below). |
+| `--quiet` | Suppress stderr progress output. |
+| `--accessible` | Enable screen reader friendly output — replaces Unicode symbols with plain text, removes decorative borders, and responds to the `INK_SCREEN_READER` environment variable. |
+
+JSON output envelope:
 
 ```json
 { "ok": true, "status": "success", "data": { ... } }
