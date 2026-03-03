@@ -2,7 +2,7 @@ import { DEFAULT_MODEL } from "../config";
 
 import type { Area } from "./analyzer";
 import { assertCopilotCliReady } from "./copilot";
-import { approveAllPermissions, createCopilotClient } from "./copilotSdk";
+import { createCopilotClient } from "./copilotSdk";
 
 const EVAL_SCAFFOLD_TIMEOUT_MS = 600000;
 const EVAL_SCAFFOLD_RECOVERY_TIMEOUT_MS = 90000;
@@ -55,7 +55,6 @@ export async function generateEvalScaffold(options: EvalScaffoldOptions): Promis
         content:
           "You are an expert codebase analyst specializing in deep architectural analysis. Generate challenging, cross-cutting eval cases for this repository that require synthesizing information from multiple files and tracing logic across layers. Avoid trivial questions answerable from a single file read or grep. Use tools (glob, view, grep) extensively to inspect the codebase. Output ONLY JSON with keys: instructionFile, cases (array of {id,prompt,expectation})."
       },
-      onPermissionRequest: approveAllPermissions,
       infiniteSessions: { enabled: false }
     });
 

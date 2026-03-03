@@ -6,14 +6,6 @@ import { buildExecArgs, logCopilotDebug, type CopilotCliConfig } from "./copilot
 
 export type CopilotSdkModule = typeof CopilotSdk;
 
-/**
- * A permission handler that approves all permission requests.
- * Required by Copilot SDK >= 0.1.28 when creating sessions.
- */
-export const approveAllPermissions: CopilotSdk.PermissionHandler = () => ({
-  kind: "approved" as const
-});
-
 let cachedSdkModule: Promise<CopilotSdkModule> | null = null;
 
 function normalizeSdkLoadError(error: unknown): Error {
@@ -130,6 +122,24 @@ async function startExternalServer(cliConfig: CopilotCliConfig): Promise<{
   });
 }
 
+/**
+ * Wrap createSession so every session automatically approves all permission
+ * requests.  Copilot SDK >= 0.1.28 requires an explicit onPermissionRequest
+ * handler; without one, session creation fails.  Injecting it here keeps the
+ * concern centralised and prevents call-sites from forgetting the handler.
+ */
+function attachDefaultPermissionHandler(
+  client: InstanceType<CopilotSdkModule["CopilotClient"]>
+): void {
+  const approveAll: CopilotSdk.PermissionHandler = () => ({ kind: "approved" as const });
+  const originalCreateSession = client.createSession.bind(client);
+  client.createSession = ((config: CopilotSdk.SessionConfig) =>
+    originalCreateSession({
+      ...config,
+      onPermissionRequest: config.onPermissionRequest ?? approveAll
+    })) as typeof client.createSession;
+}
+
 function attachExternalServerCleanup(
   client: InstanceType<CopilotSdkModule["CopilotClient"]>,
   cliProcess: ChildProcess
@@ -169,6 +179,7 @@ export async function createCopilotClient(
 
   try {
     await primaryClient.start();
+    attachDefaultPermissionHandler(primaryClient);
     return primaryClient;
   } catch (error) {
     if (!shouldFallbackToExternalServer(error)) {
@@ -194,6 +205,7 @@ export async function createCopilotClient(
     }
 
     attachExternalServerCleanup(fallbackClient, external.cliProcess);
+    attachDefaultPermissionHandler(fallbackClient);
     return fallbackClient;
   }
 }

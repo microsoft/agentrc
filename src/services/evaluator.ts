@@ -4,7 +4,7 @@ import path from "path";
 import { buildTimestampedName, safeWriteFile } from "../utils/fs";
 
 import { assertCopilotCliReady } from "./copilot";
-import { approveAllPermissions, createCopilotClient } from "./copilotSdk";
+import { createCopilotClient } from "./copilotSdk";
 import type { EvalConfig } from "./evalScaffold";
 
 const DEFAULT_SYSTEM_MESSAGE =
@@ -227,7 +227,6 @@ async function askOnce(client: CopilotClient, options: AskOptions): Promise<AskR
     streaming: true,
     infiniteSessions: { enabled: false },
     systemMessage: options.systemMessage ? { content: options.systemMessage } : undefined,
-    onPermissionRequest: approveAllPermissions,
     ...(options.workingDirectory ? { workingDirectory: options.workingDirectory } : {})
   });
 
@@ -281,8 +280,7 @@ async function judge(
     systemMessage: {
       content:
         "You are a strict evaluator. Return JSON with keys: verdict (pass|fail|unknown), score (0-100), rationale. Do not include any other text."
-    },
-    onPermissionRequest: approveAllPermissions
+    }
   });
 
   let content = "";
