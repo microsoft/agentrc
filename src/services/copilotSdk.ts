@@ -33,7 +33,8 @@ function shouldFallbackToExternalServer(error: unknown): boolean {
   const message = normalizeError(error).message.toLowerCase();
   return (
     message.includes("unknown option '--headless'") ||
-    message.includes("unknown option '--no-auto-update'")
+    message.includes("unknown option '--no-auto-update'") ||
+    message.includes("copilot cli not found")
   );
 }
 
@@ -45,11 +46,13 @@ async function startExternalServer(cliConfig: CopilotCliConfig): Promise<{
   logCopilotDebug(`starting external CLI server: ${cmd} ${args.join(" ")}`);
 
   return await new Promise((resolve, reject) => {
+    const isWindows = process.platform === "win32";
     const cliProcess = spawn(cmd, args, {
       cwd: process.cwd(),
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true
+      windowsHide: true,
+      detached: !isWindows
     });
 
     let stdout = "";
@@ -61,9 +64,7 @@ async function startExternalServer(cliConfig: CopilotCliConfig): Promise<{
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      if (!cliProcess.killed) {
-        cliProcess.kill();
-      }
+      killProcessTree(cliProcess);
       reject(normalizeError(reason));
     };
 
@@ -140,6 +141,23 @@ function attachDefaultPermissionHandler(
     })) as typeof client.createSession;
 }
 
+function killProcessTree(cliProcess: ChildProcess): void {
+  if (cliProcess.killed) return;
+  // On Unix, kill the process group (negative PID) to clean up grandchild processes (e.g. npx -> copilot)
+  if (process.platform !== "win32" && cliProcess.pid) {
+    try {
+      process.kill(-cliProcess.pid, "SIGTERM");
+    } catch {
+      cliProcess.kill();
+    }
+  } else {
+    cliProcess.kill();
+  }
+  cliProcess.stdout?.destroy();
+  cliProcess.stderr?.destroy();
+  cliProcess.unref();
+}
+
 function attachExternalServerCleanup(
   client: InstanceType<CopilotSdkModule["CopilotClient"]>,
   cliProcess: ChildProcess
@@ -147,9 +165,7 @@ function attachExternalServerCleanup(
   const originalStop = client.stop.bind(client);
   client.stop = (async () => {
     const errors = await originalStop();
-    if (!cliProcess.killed) {
-      cliProcess.kill();
-    }
+    killProcessTree(cliProcess);
     return errors;
   }) as typeof client.stop;
 }
@@ -173,6 +189,26 @@ export async function createCopilotClient(
     ? `${cliConfig.cliPath} ${cliConfig.cliArgs.join(" ")}`
     : cliConfig.cliPath;
   logCopilotDebug(`creating SDK client with cliPath=${desc} useStdio=false`);
+
+  // npx spawns a grandchild process (npx -> node -> copilot) that the SDK
+  // cannot clean up — killing npx leaves the copilot binary running.
+  // Use external server mode where we manage the process tree ourselves.
+  const isNpx = /\bnpx(?:\.cmd)?$/iu.test(cliConfig.cliPath);
+  if (isNpx) {
+    logCopilotDebug("npx wrapper detected; using external server mode");
+    const external = await startExternalServer(cliConfig);
+    const client = new sdk.CopilotClient({ cliUrl: external.cliUrl });
+    try {
+      await client.start();
+    } catch (startError) {
+      killProcessTree(external.cliProcess);
+      throw normalizeError(startError);
+    }
+    attachExternalServerCleanup(client, external.cliProcess);
+    attachDefaultPermissionHandler(client);
+    return client;
+  }
+
   // Always pass an explicit CLI config so the SDK does not fall back to package-local CLI resolution.
   // Use TCP transport because some VS Code Copilot CLI shims reject stdio mode.
   const primaryClient = new sdk.CopilotClient({ ...cliConfig, useStdio: false });

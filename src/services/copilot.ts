@@ -40,8 +40,10 @@ export async function assertCopilotCliReady(): Promise<CopilotCliConfig> {
   logCopilotDebug(`validating CLI compatibility with ${desc}`);
 
   try {
+    const isNpx = config.cliArgs?.includes("@github/copilot") ?? false;
+    const timeout = isNpx ? 30000 : 5000;
     const [cmd, args] = buildExecArgs(config, ["--headless", "--version"]);
-    await execFileAsync(cmd, args, { timeout: 5000 });
+    await execFileAsync(cmd, args, { timeout });
   } catch {
     cachedCliConfig = null;
     throw new Error(
@@ -133,7 +135,22 @@ async function findCopilotCliConfig(): Promise<CopilotCliConfig> {
       logCopilotDebug(`discovered candidate from PATH: ${found}`);
     }
   } catch {
-    // Not on PATH, will try VS Code locations
+    // Not on PATH, will try npx and VS Code locations
+  }
+
+  // Try npx as a fallback — always fetches the latest @github/copilot
+  try {
+    const { stdout } = await execFileAsync(whichCmd, ["npx"], { timeout: 5000 });
+    const npxPath = stdout.trim().split(/\r?\n/)[0];
+    if (npxPath) {
+      candidates.push({
+        config: { cliPath: npxPath, cliArgs: ["--yes", "@github/copilot"] },
+        source: "npx @github/copilot"
+      });
+      logCopilotDebug(`discovered candidate from npx: ${npxPath} --yes @github/copilot`);
+    }
+  } catch {
+    // npx not available
   }
 
   const staticLocations: string[] = [];
@@ -245,9 +262,12 @@ async function findFirstCompatibleCandidate(
 }
 
 async function isHeadlessCompatible(config: CopilotCliConfig): Promise<boolean> {
+  // npx may need to download the package on first run, so allow a longer timeout
+  const isNpx = config.cliArgs?.includes("@github/copilot") ?? false;
+  const timeout = isNpx ? 30000 : 5000;
   try {
     const [cmd, args] = buildExecArgs(config, ["--headless", "--version"]);
-    await execFileAsync(cmd, args, { timeout: 5000 });
+    await execFileAsync(cmd, args, { timeout });
     return true;
   } catch {
     return false;

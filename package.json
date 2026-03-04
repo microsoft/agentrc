@@ -26,7 +26,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@github/copilot-sdk": "^0.1.24",
+    "@github/copilot-sdk": "^0.1.29",
     "@inquirer/prompts": "^8.2.1",
     "@octokit/rest": "^22.0.1",
     "chalk": "^5.6.2",
