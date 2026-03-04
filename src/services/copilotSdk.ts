@@ -124,6 +124,27 @@ async function startExternalServer(cliConfig: CopilotCliConfig): Promise<{
 }
 
 /**
+ * Subset of SessionConfig where onPermissionRequest is optional.
+ * attachDefaultPermissionHandler injects a default approve-all handler so
+ * call-sites do not need to supply one.
+ */
+type SessionConfigInput = Omit<CopilotSdk.SessionConfig, "onPermissionRequest"> & {
+  onPermissionRequest?: CopilotSdk.PermissionHandler;
+};
+
+/**
+ * The type returned by createCopilotClient after the default permission handler
+ * has been attached.  createSession accepts configs where onPermissionRequest
+ * is optional because attachDefaultPermissionHandler injects a default.
+ */
+export type PatchedCopilotClient = Omit<
+  InstanceType<CopilotSdkModule["CopilotClient"]>,
+  "createSession"
+> & {
+  createSession(config: SessionConfigInput): Promise<CopilotSdk.CopilotSession>;
+};
+
+/**
  * Wrap createSession so every session automatically approves all permission
  * requests.  Copilot SDK >= 0.1.28 requires an explicit onPermissionRequest
  * handler; without one, session creation fails.  Injecting it here keeps the
@@ -134,11 +155,15 @@ export function attachDefaultPermissionHandler(
 ): void {
   const approveAll: CopilotSdk.PermissionHandler = () => ({ kind: "approved" as const });
   const originalCreateSession = client.createSession.bind(client);
-  client.createSession = ((config: CopilotSdk.SessionConfig) =>
+  // Override createSession so onPermissionRequest is optional at call sites.
+  // The cast targets our PatchedCopilotClient createSession signature which
+  // accepts the optional permission handler; the 'unknown' intermediate step
+  // is safe because attachDefaultPermissionHandler always injects a default.
+  (client as unknown as PatchedCopilotClient).createSession = (config: SessionConfigInput) =>
     originalCreateSession({
-      ...config,
+      ...(config as CopilotSdk.SessionConfig),
       onPermissionRequest: config.onPermissionRequest ?? approveAll
-    })) as typeof client.createSession;
+    });
 }
 
 function killProcessTree(cliProcess: ChildProcess): void {
@@ -183,7 +208,7 @@ export async function loadCopilotSdk(): Promise<CopilotSdkModule> {
 
 export async function createCopilotClient(
   cliConfig: CopilotCliConfig
-): Promise<InstanceType<CopilotSdkModule["CopilotClient"]>> {
+): Promise<PatchedCopilotClient> {
   const sdk = await loadCopilotSdk();
   const desc = cliConfig.cliArgs
     ? `${cliConfig.cliPath} ${cliConfig.cliArgs.join(" ")}`
@@ -206,7 +231,7 @@ export async function createCopilotClient(
     }
     attachExternalServerCleanup(client, external.cliProcess);
     attachDefaultPermissionHandler(client);
-    return client;
+    return client as unknown as PatchedCopilotClient;
   }
 
   // Always pass an explicit CLI config so the SDK does not fall back to package-local CLI resolution.
@@ -216,7 +241,7 @@ export async function createCopilotClient(
   try {
     await primaryClient.start();
     attachDefaultPermissionHandler(primaryClient);
-    return primaryClient;
+    return primaryClient as unknown as PatchedCopilotClient;
   } catch (error) {
     if (!shouldFallbackToExternalServer(error)) {
       throw normalizeError(error);
@@ -242,6 +267,6 @@ export async function createCopilotClient(
 
     attachExternalServerCleanup(fallbackClient, external.cliProcess);
     attachDefaultPermissionHandler(fallbackClient);
-    return fallbackClient;
+    return fallbackClient as unknown as PatchedCopilotClient;
   }
 }

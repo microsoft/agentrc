@@ -17,7 +17,7 @@ interface CopilotSession {
 }
 
 interface CopilotClient {
-  createSession(config?: Record<string, unknown>): Promise<CopilotSession>;
+  createSession(config: Record<string, unknown>): Promise<CopilotSession>;
   stop(): Promise<unknown>;
 }
 
