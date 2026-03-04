@@ -10,10 +10,17 @@
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsx src/index.ts",
-    "prepare": "npm run build && (test \"$CI\" = true || husky)",
+    "prepare": "node --input-type=commonjs -e \"if(process.env.CI!=='true'){require('child_process').execSync('npx husky',{stdio:'inherit'})}\"",
+    "prepublishOnly": "npm run build",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -22,8 +29,13 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "ai",
+    "copilot",
+    "developer-tools",
+    "cli"
+  ],
+  "author": "Microsoft",
   "license": "MIT",
   "dependencies": {
     "@github/copilot-sdk": "^0.1.29",

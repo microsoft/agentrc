@@ -14,24 +14,24 @@ AgentRC is a CLI and VS Code extension that helps teams prepare repositories for
 
 ```bash
 # Run directly (no install needed)
-npx github:microsoft/agentrc readiness
+npx @microsoft/agentrc readiness
 ```
 
-`npx github:<owner>/agentrc ...` installs from the Git repository and runs the package `prepare` script, which builds the CLI before first use.
-
-Or install locally:
+Or install globally:
 
 ```bash
-git clone https://github.com/microsoft/agentrc.git
-cd agentrc && npm install && npm run build && npm link
+npm install -g @microsoft/agentrc
 
-# 1. Check how AI-ready your repo is
+# 1. Check your environment
+agentrc doctor
+
+# 2. Check how AI-ready your repo is
 agentrc readiness
 
-# 2. Generate AI instructions
+# 3. Generate AI instructions
 agentrc instructions
 
-# 3. Generate MCP and VS Code configs
+# 4. Generate MCP and VS Code configs
 agentrc generate mcp
 agentrc generate vscode
 
@@ -40,6 +40,8 @@ agentrc init
 ```
 
 ## Prerequisites
+
+Run `agentrc doctor` to verify your environment. Required:
 
 | Requirement                       | Notes                                                            |
 | --------------------------------- | ---------------------------------------------------------------- |
@@ -142,6 +144,15 @@ agentrc tui
 ### `agentrc init` — Guided Setup
 
 Interactive or headless repo onboarding — detects your stack and walks through readiness, instructions, and config generation. For monorepos, auto-detects workspaces and bootstraps `agentrc.config.json` with workspace and area definitions.
+
+### `agentrc doctor` — Check Prerequisites
+
+Verify your environment is set up correctly:
+
+```bash
+agentrc doctor                            # human-readable status
+agentrc doctor --json                     # machine-readable check results
+```
 
 ### Global Options
 

@@ -1,4 +1,8 @@
+import { readFileSync } from "fs";
+
 import { defineConfig } from "tsup";
+
+const pkg = JSON.parse(readFileSync("package.json", "utf8"));
 
 export default defineConfig({
   entry: ["src/index.ts"],
@@ -16,5 +20,9 @@ export default defineConfig({
   external: [/^[^./]/],
   esbuildOptions(options) {
     options.jsx = "automatic";
+    options.define = {
+      ...options.define,
+      "process.env.AGENTRC_VERSION": JSON.stringify(pkg.version)
+    };
   }
 });
