@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+
 import { Argument, Command } from "commander";
 
 import { analyzeCommand } from "./commands/analyze";
@@ -11,6 +13,9 @@ import { prCommand } from "./commands/pr";
 import { readinessCommand } from "./commands/readiness";
 import { tuiCommand } from "./commands/tui";
 import { DEFAULT_MODEL, DEFAULT_JUDGE_MODEL } from "./config";
+
+const _require = createRequire(import.meta.url);
+export const CLI_VERSION = (_require("../package.json") as { version: string }).version;
 
 /**
  * Merge program-level --json/--quiet into each command's local options
@@ -41,7 +46,7 @@ export function runCli(argv: string[]): void {
   program
     .name("agentrc")
     .description("Set up repositories for AI-assisted development")
-    .version("1.0.0")
+    .version(CLI_VERSION)
     .option("--json", "Output machine-readable JSON to stdout")
     .option("--quiet", "Suppress stderr progress output")
     .option("--accessible", "Enable screen reader friendly output");

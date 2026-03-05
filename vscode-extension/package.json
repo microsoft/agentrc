@@ -191,7 +191,7 @@
       "properties": {
         "agentrc.model": {
           "type": "string",
-          "default": "claude-sonnet-4.5",
+          "default": "claude-sonnet-4.6",
           "description": "Default Copilot model to use for generation."
         },
         "agentrc.autoAnalyze": {
@@ -284,18 +284,25 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "package": "vsce package"
   },
   "extensionDependencies": [
     "vscode.git"
   ],
   "devDependencies": {
-    "@github/copilot-sdk": "^0.1.24",
+    "@eslint/js": "^9.39.0",
+    "@github/copilot-sdk": "^0.1.29",
     "@octokit/rest": "^22.0.1",
+    "@typescript-eslint/eslint-plugin": "^8.56.0",
+    "@typescript-eslint/parser": "^8.56.0",
     "@types/node": "^25.2.3",
     "@types/vscode": "^1.109.0",
     "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.27.3",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^9.1.2",
+    "globals": "^17.3.0",
     "typescript": "^5.9.3"
   }
 }

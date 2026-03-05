@@ -1,7 +1,18 @@
+import { createRequire } from "node:module";
+
 import type { Command } from "commander";
 import { describe, expect, it, vi } from "vitest";
 
-import { withGlobalOpts } from "../../cli";
+import { CLI_VERSION, withGlobalOpts } from "../../cli";
+
+const _require = createRequire(import.meta.url);
+const { version: pkgVersion } = _require("../../../package.json") as { version: string };
+
+describe("CLI version", () => {
+  it("matches package.json version", () => {
+    expect(CLI_VERSION).toBe(pkgVersion);
+  });
+});
 
 describe("withGlobalOpts", () => {
   function buildFakeCommand(globalOpts: Record<string, unknown>): Command {

@@ -31,6 +31,28 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 - Use GitHub Issues for bugs and feature requests.
 - Provide steps to reproduce and expected behavior.
 
+## CI & Branch Protection
+
+All pull requests run the following required status checks before merge:
+
+| Job                   | What it verifies                                |
+| --------------------- | ----------------------------------------------- |
+| `lint`                | ESLint + Prettier (root)                        |
+| `lint-workflows`      | actionlint on all `.github/workflows/*.yml`     |
+| `lint-extension`      | ESLint (vscode-extension)                       |
+| `typecheck`           | TypeScript (root)                               |
+| `typecheck-extension` | TypeScript (vscode-extension)                   |
+| `test`                | Vitest (Node 20 + 22, ubuntu + windows)         |
+| `build`               | tsup build + CLI version assertion + ext bundle |
+
+To configure branch protection rules in GitHub:
+
+1. Go to **Settings → Branches → Branch protection rules**.
+2. Add a rule for `main`.
+3. Enable **Require status checks to pass before merging**.
+4. Search for and add each job name listed above.
+5. Enable **Require branches to be up to date before merging**.
+
 ## Releasing
 
 Releases are automated with release-please when changes are merged to main.

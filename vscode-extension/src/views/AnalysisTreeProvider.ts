@@ -69,7 +69,7 @@ export class AnalysisTreeProvider implements vscode.TreeDataProvider<AnalysisIte
           md.appendMarkdown(`**${a.name}**`);
           if (a.description) md.appendMarkdown(`\n\n${a.description}`);
           md.appendMarkdown(
-            `\n\nGlobs: \`${typeof a.applyTo === "string" ? a.applyTo : a.applyTo.join("\`, \`")}\``
+            `\n\nGlobs: ${typeof a.applyTo === "string" ? "`" + a.applyTo + "`" : a.applyTo.map((g) => "`" + g + "`").join(", ")}`
           );
           item.tooltip = md;
           return item;

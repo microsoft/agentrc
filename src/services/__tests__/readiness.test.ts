@@ -462,6 +462,27 @@ describe("runReadinessReport", () => {
 
       expect(report.extras).toHaveLength(0);
     });
+
+    it("excludes reason when extra passes", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("AGENTS.md", "# Agent instructions");
+
+      const report = await runReadinessReport({ repoPath });
+
+      const agentsExtra = report.extras.find((e) => e.id === "agents-doc");
+      expect(agentsExtra?.status).toBe("pass");
+      expect(agentsExtra?.reason).toBeUndefined();
+    });
+
+    it("includes reason when extra fails", async () => {
+      await writePackageJson({ name: "test-repo" });
+
+      const report = await runReadinessReport({ repoPath });
+
+      const agentsExtra = report.extras.find((e) => e.id === "agents-doc");
+      expect(agentsExtra?.status).toBe("fail");
+      expect(agentsExtra?.reason).toBeTruthy();
+    });
   });
 
   describe("per-area readiness", () => {

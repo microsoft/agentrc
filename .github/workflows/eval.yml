@@ -51,7 +51,7 @@ jobs:
 
       - run: npm run build
 
-      - name: Install CopiI want to have a Kanban-style agent management UI that lets me move agents from queue to running to done. Wait, actually, I have already a plan. Let me just pull the plan in.lot CLI
+      - name: Install Copilot CLI
         run: npm install -g @github/copilot
         env:
           GH_TOKEN: ${{ secrets.COPILOT_TOKEN }}

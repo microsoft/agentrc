@@ -13,6 +13,13 @@ permissions:
   contents: read
 
 jobs:
+  lint-workflows:
+    name: Lint Workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rhysd/actionlint@v1
+
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
@@ -58,6 +65,24 @@ jobs:
       - run: npx tsc --noEmit
         working-directory: vscode-extension
 
+  lint-extension:
+    name: Lint Extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            vscode-extension/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: vscode-extension
+      - run: npx eslint .
+        working-directory: vscode-extension
+
   test:
     name: Test (Node ${{ matrix.node }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -89,7 +114,7 @@ jobs:
   build:
     name: Build & Verify
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, typecheck-extension, test]
+    needs: [lint, typecheck, typecheck-extension, test, lint-workflows, lint-extension]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -102,7 +127,14 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Verify CLI
-        run: node dist/index.js --version
+        run: |
+          CLI_VERSION=$(node dist/index.js --version)
+          PKG_VERSION=$(node -e "console.log(require('./package.json').version)")
+          if [ "$CLI_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::CLI version ($CLI_VERSION) does not match package.json ($PKG_VERSION)"
+            exit 1
+          fi
+          echo "CLI version: $CLI_VERSION ✓"
       - name: Build extension
         run: npm ci && node esbuild.mjs
         working-directory: vscode-extension

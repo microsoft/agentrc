@@ -5,7 +5,7 @@
  * Only the interfaces used by the AgentRC extension are included.
  */
 
-import { Uri } from "vscode";
+import type { Uri } from "vscode";
 
 export interface GitExtension {
   getAPI(version: 1): API;

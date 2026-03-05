@@ -947,34 +947,46 @@ export function buildExtras(): ExtraDefinition[] {
     {
       id: "agents-doc",
       title: "AGENTS.md present",
-      check: async (context) => ({
-        status: (await fileExists(path.join(context.repoPath, "AGENTS.md"))) ? "pass" : "fail",
-        reason: "Missing AGENTS.md to guide coding agents."
-      })
+      check: async (context) => {
+        const found = await fileExists(path.join(context.repoPath, "AGENTS.md"));
+        return {
+          status: found ? "pass" : "fail",
+          reason: found ? undefined : "Missing AGENTS.md to guide coding agents."
+        };
+      }
     },
     {
       id: "pr-template",
       title: "Pull request template present",
-      check: async (context) => ({
-        status: (await hasPullRequestTemplate(context.repoPath)) ? "pass" : "fail",
-        reason: "Missing PR template for consistent reviews."
-      })
+      check: async (context) => {
+        const found = await hasPullRequestTemplate(context.repoPath);
+        return {
+          status: found ? "pass" : "fail",
+          reason: found ? undefined : "Missing PR template for consistent reviews."
+        };
+      }
     },
     {
       id: "pre-commit",
       title: "Pre-commit hooks configured",
-      check: async (context) => ({
-        status: (await hasPrecommitConfig(context.repoPath)) ? "pass" : "fail",
-        reason: "Missing pre-commit or Husky configuration for fast feedback."
-      })
+      check: async (context) => {
+        const found = await hasPrecommitConfig(context.repoPath);
+        return {
+          status: found ? "pass" : "fail",
+          reason: found ? undefined : "Missing pre-commit or Husky configuration for fast feedback."
+        };
+      }
     },
     {
       id: "architecture-doc",
       title: "Architecture guide present",
-      check: async (context) => ({
-        status: (await hasArchitectureDoc(context.repoPath)) ? "pass" : "fail",
-        reason: "Missing architecture documentation."
-      })
+      check: async (context) => {
+        const found = await hasArchitectureDoc(context.repoPath);
+        return {
+          status: found ? "pass" : "fail",
+          reason: found ? undefined : "Missing architecture documentation."
+        };
+      }
     }
   ];
 }
