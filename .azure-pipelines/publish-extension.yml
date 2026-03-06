@@ -1,59 +1,59 @@
 trigger:
-    branches:
-        include:
-            - main
+  branches:
+    include:
+      - main
 pr: none
 
 resources:
-    repositories:
-        - repository: templates
-          type: github
-          name: microsoft/vscode-engineering
-          ref: main
-          endpoint: Monaco
+  repositories:
+    - repository: templates
+      type: github
+      name: microsoft/vscode-engineering
+      ref: main
+      endpoint: Monaco
 
 parameters:
-    - name: generateNotice
-      displayName: 📝 Generate Notice
-      type: boolean
-      default: true
-    - name: publishExtension
-      displayName: 🚀 Publish Extension
-      type: boolean
-      default: false
+  - name: generateNotice
+    displayName: 📝 Generate Notice
+    type: boolean
+    default: true
+  - name: publishExtension
+    displayName: 🚀 Publish Extension
+    type: boolean
+    default: false
 
 extends:
-    template: azure-pipelines/extension/stable.yml@templates
-    parameters:
-        publishExtension: ${{ parameters.publishExtension }}
-        generateNotice: ${{ parameters.generateNotice }}
-        nodeVersion: 22.x
+  template: azure-pipelines/extension/stable.yml@templates
+  parameters:
+    publishExtension: ${{ parameters.publishExtension }}
+    generateNotice: ${{ parameters.generateNotice }}
+    nodeVersion: 22.x
 
-        buildSteps:
-            - task: NodeTool@0
-              inputs:
-                  versionSpec: 22.x
-              displayName: Install Node.js
+    buildSteps:
+      - task: NodeTool@0
+        inputs:
+          versionSpec: 22.x
+        displayName: Install Node.js
 
-            - script: npm ci --ignore-scripts
-              displayName: Install root dependencies
+      - script: npm ci --ignore-scripts
+        displayName: Install root dependencies
 
-            - script: npm ci
-              displayName: Install extension dependencies
-              workingDirectory: vscode-extension
+      - script: npm ci
+        displayName: Install extension dependencies
+        workingDirectory: vscode-extension
 
-            - script: npm run build
-              displayName: Build CLI
+      - script: npm run build
+        displayName: Build CLI
 
-            - script: node esbuild.mjs --production
-              displayName: Build extension
-              workingDirectory: vscode-extension
+      - script: node esbuild.mjs --production
+        displayName: Build extension
+        workingDirectory: vscode-extension
 
-            - script: npm run test
-              displayName: Test
+      - script: npm run test
+        displayName: Test
 
-        tsa:
-            config:
-                areaPath: "Visual Studio Code Miscellaneous Extensions"
-                serviceTreeID: "c8cb03c6-176e-40dd-90a5-518de08666dc"
-            enabled: true
+    tsa:
+      config:
+        areaPath: "Visual Studio Code Miscellaneous Extensions"
+        serviceTreeID: "c8cb03c6-176e-40dd-90a5-518de08666dc"
+      enabled: true
