@@ -3,7 +3,12 @@ import os from "os";
 import path from "path";
 
 import type { Area } from "@agentrc/core/services/analyzer";
+import * as copilotModule from "@agentrc/core/services/copilot";
+import * as copilotSdkModule from "@agentrc/core/services/copilotSdk";
 import {
+  generateAreaInstructions,
+  generateCopilotInstructions,
+  generateNestedInstructions,
   writeAreaInstruction,
   writeInstructionFile,
   writeNestedInstructions,
@@ -12,10 +17,11 @@ import {
   areaInstructionPath,
   detectExistingInstructions,
   buildExistingInstructionsSection,
-  parseTopicsFromHub
+  parseTopicsFromHub,
+  stripMarkdownFences
 } from "@agentrc/core/services/instructions";
 import type { NestedInstructionsResult } from "@agentrc/core/services/instructions";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("writeAreaInstruction", () => {
   let tmpDir: string;
@@ -688,5 +694,361 @@ describe("parseTopicsFromHub", () => {
 
     expect(result.topics).toEqual([]);
     expect(result.cleanContent).toBe(content);
+  });
+});
+
+describe("stripMarkdownFences", () => {
+  it("strips outer ```markdown fence", () => {
+    const input = "```markdown\n# Title\n\nSome content\n```";
+    expect(stripMarkdownFences(input)).toBe("# Title\n\nSome content");
+  });
+
+  it("strips outer ```md fence", () => {
+    const input = "```md\n# Title\n\nSome content\n```";
+    expect(stripMarkdownFences(input)).toBe("# Title\n\nSome content");
+  });
+
+  it("strips outer bare ``` fence", () => {
+    const input = "```\n# Title\n\nSome content\n```";
+    expect(stripMarkdownFences(input)).toBe("# Title\n\nSome content");
+  });
+
+  it("returns unfenced content unchanged", () => {
+    const input = "# Title\n\nSome content";
+    expect(stripMarkdownFences(input)).toBe("# Title\n\nSome content");
+  });
+
+  it("preserves internal code fences", () => {
+    const input = "# Title\n\n```ts\nconst x = 1;\n```\n\nMore text";
+    expect(stripMarkdownFences(input)).toBe(input);
+  });
+
+  it("strips only outer fence when both outer and inner exist", () => {
+    const input = "```markdown\n# Title\n\n```ts\nconst x = 1;\n```\n\nMore text\n```";
+    expect(stripMarkdownFences(input)).toBe("# Title\n\n```ts\nconst x = 1;\n```\n\nMore text");
+  });
+
+  it("trims surrounding whitespace", () => {
+    const input = "  \n```markdown\n# Title\n```\n  ";
+    expect(stripMarkdownFences(input)).toBe("# Title");
+  });
+
+  it("handles empty content", () => {
+    expect(stripMarkdownFences("")).toBe("");
+    expect(stripMarkdownFences("  ")).toBe("");
+  });
+});
+
+describe("instruction generation sessions", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "agentrc-gen-"));
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  type MockSession = {
+    on: ReturnType<typeof vi.fn>;
+    sendAndWait: ReturnType<typeof vi.fn>;
+    destroy: ReturnType<typeof vi.fn>;
+    rpc: {
+      mode: {
+        set: ReturnType<typeof vi.fn>;
+      };
+    };
+  };
+
+  const createMockSession = () => {
+    const handlers: Array<(event: { type: string; data?: Record<string, unknown> }) => void> = [];
+    const session: MockSession = {
+      on: vi.fn((handler) => {
+        handlers.push(handler);
+      }),
+      sendAndWait: vi.fn(),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      rpc: {
+        mode: {
+          set: vi.fn().mockResolvedValue(undefined)
+        }
+      }
+    };
+
+    return {
+      session,
+      emit: (event: { type: string; data?: Record<string, unknown> }) => {
+        for (const handler of handlers) {
+          handler(event);
+        }
+      }
+    };
+  };
+
+  const mockSdkTools = () => {
+    vi.spyOn(copilotSdkModule, "loadCopilotSdk").mockResolvedValue({
+      defineTool: vi.fn((name: string, config: Record<string, unknown>) => ({
+        name,
+        ...config
+      }))
+    } as never);
+  };
+
+  const mockClient = (sessions: MockSession[]) => {
+    const createSession = vi.fn().mockImplementation(async (_config) => {
+      const nextSession = sessions.shift();
+      expect(nextSession).toBeDefined();
+      return nextSession as never;
+    });
+    const stop = vi.fn().mockResolvedValue(undefined);
+
+    vi.spyOn(copilotModule, "assertCopilotCliReady").mockResolvedValue({} as never);
+    vi.spyOn(copilotSdkModule, "createCopilotClient").mockResolvedValue({
+      createSession,
+      stop
+    } as never);
+
+    return { createSession, stop };
+  };
+
+  const expectReadOnlyPermissions = async (
+    onPermissionRequest: (request: { kind: string }) => Promise<{ kind: string }> | { kind: string }
+  ) => {
+    await expect(Promise.resolve(onPermissionRequest({ kind: "read" }))).resolves.toEqual({
+      kind: "approved"
+    });
+    await expect(Promise.resolve(onPermissionRequest({ kind: "custom-tool" }))).resolves.toEqual({
+      kind: "approved"
+    });
+    await expect(Promise.resolve(onPermissionRequest({ kind: "shell" }))).resolves.toEqual({
+      kind: "denied-no-approval-rule-and-could-not-request-from-user"
+    });
+    await expect(Promise.resolve(onPermissionRequest({ kind: "write" }))).resolves.toEqual({
+      kind: "denied-no-approval-rule-and-could-not-request-from-user"
+    });
+  };
+
+  it("prefers emitted content and applies read-only permissions", async () => {
+    const { session, emit } = createMockSession();
+    const { createSession } = mockClient([session]);
+    mockSdkTools();
+
+    session.sendAndWait.mockImplementation(async () => {
+      emit({ type: "assistant.message_delta", data: { deltaContent: "# Chat fallback" } });
+      const [config] = createSession.mock.calls[0] as unknown as [
+        { tools: Array<{ handler: Function }> }
+      ];
+      await config.tools[0].handler({ content: "```markdown\n# Final\n\nBody\n```" });
+    });
+
+    const result = await generateCopilotInstructions({ repoPath: tmpDir });
+
+    expect(result).toBe("# Final\n\nBody");
+    expect(session.rpc.mode.set).toHaveBeenCalledWith({ mode: "autopilot" });
+
+    const [config] = createSession.mock.calls[0] as [
+      {
+        excludedTools: string[];
+        onPermissionRequest: (request: {
+          kind: string;
+        }) => Promise<{ kind: string }> | { kind: string };
+      }
+    ];
+    expect(config.excludedTools).toEqual([
+      "edit_file",
+      "create_file",
+      "bash",
+      "str_replace_editor"
+    ]);
+    await expectReadOnlyPermissions(config.onPermissionRequest);
+  });
+
+  it("falls back to streamed chat content when the emit tool is not called and ignores autopilot failure", async () => {
+    const area: Area = {
+      name: "frontend",
+      applyTo: "src/**/*.ts",
+      workingDirectory: "packages/frontend",
+      source: "config"
+    };
+    const { session, emit } = createMockSession();
+    const { createSession } = mockClient([session]);
+    mockSdkTools();
+
+    session.rpc.mode.set.mockRejectedValue(new Error("unsupported"));
+    session.sendAndWait.mockImplementation(async () => {
+      emit({
+        type: "assistant.message_delta",
+        data: { deltaContent: "```md\n# Area Guide\n\nUse patterns.\n```" }
+      });
+    });
+
+    const result = await generateAreaInstructions({ repoPath: tmpDir, area });
+
+    expect(result).toBe("# Area Guide\n\nUse patterns.");
+    expect(session.rpc.mode.set).toHaveBeenCalledWith({ mode: "autopilot" });
+
+    const [config] = createSession.mock.calls[0] as [
+      {
+        onPermissionRequest: (request: {
+          kind: string;
+        }) => Promise<{ kind: string }> | { kind: string };
+        workingDirectory: string;
+      }
+    ];
+    expect(config.workingDirectory).toBe(path.join(tmpDir, "packages/frontend"));
+    await expectReadOnlyPermissions(config.onPermissionRequest);
+  });
+
+  it("uses absolute area paths as-is when they stay inside the repo", async () => {
+    const area: Area = {
+      name: "frontend",
+      applyTo: "src/**/*.ts",
+      path: path.join(tmpDir, "packages/frontend"),
+      source: "auto"
+    };
+    const { session, emit } = createMockSession();
+    const { createSession } = mockClient([session]);
+    mockSdkTools();
+
+    session.sendAndWait.mockImplementation(async () => {
+      emit({
+        type: "assistant.message_delta",
+        data: { deltaContent: "```md\n# Area Guide\n```" }
+      });
+    });
+
+    await generateAreaInstructions({ repoPath: tmpDir, area });
+
+    const [config] = createSession.mock.calls[0] as [{ workingDirectory: string }];
+    expect(config.workingDirectory).toBe(path.join(tmpDir, "packages/frontend"));
+  });
+
+  it("rejects area working directories that escape the repo boundary", async () => {
+    const area: Area = {
+      name: "frontend",
+      applyTo: "src/**/*.ts",
+      workingDirectory: "../outside",
+      source: "config"
+    };
+    mockClient([]);
+    mockSdkTools();
+
+    await expect(generateAreaInstructions({ repoPath: tmpDir, area })).rejects.toThrow(
+      'Invalid workingDirectory "../outside": escapes repo boundary'
+    );
+  });
+
+  it("parses hub topics from emitted content and generates detail files", async () => {
+    const hub = createMockSession();
+    const detail = createMockSession();
+    const { createSession } = mockClient([hub.session, detail.session]);
+    mockSdkTools();
+
+    hub.session.sendAndWait.mockImplementation(async () => {
+      const [config] = createSession.mock.calls[0] as unknown as [
+        { tools: Array<{ handler: Function }> }
+      ];
+      await config.tools[0].handler({
+        content:
+          '```markdown\n# Hub\n\nOverview\n\n```json\n[{"slug":"testing","title":"Testing","description":"How to test"}]\n```\n```'
+      });
+    });
+    detail.session.sendAndWait.mockImplementation(async () => {
+      const [config] = createSession.mock.calls[1] as unknown as [
+        { tools: Array<{ handler: Function }> }
+      ];
+      await config.tools[0].handler({
+        content: "# Testing\n\n**When to read:** when updating tests"
+      });
+    });
+
+    const result = await generateNestedInstructions({
+      repoPath: tmpDir,
+      detailDir: ".agents",
+      claudeMd: false
+    });
+
+    expect(result.hub.content).toBe("# Hub\n\nOverview");
+    expect(result.details).toEqual([
+      {
+        relativePath: ".agents/testing.md",
+        content: "# Testing\n\n**When to read:** when updating tests",
+        topic: "Testing"
+      }
+    ]);
+    expect(hub.session.rpc.mode.set).toHaveBeenCalledWith({ mode: "autopilot" });
+    expect(detail.session.rpc.mode.set).toHaveBeenCalledWith({ mode: "autopilot" });
+  });
+
+  it("surfaces auth failures from nested hub generation", async () => {
+    const hub = createMockSession();
+    mockClient([hub.session]);
+    mockSdkTools();
+
+    hub.session.sendAndWait.mockImplementation(async () => {
+      hub.emit({
+        type: "session.error",
+        data: { message: "authentication required" }
+      });
+      throw new Error("raw auth rejection");
+    });
+
+    await expect(
+      generateNestedInstructions({
+        repoPath: tmpDir,
+        detailDir: ".agents",
+        claudeMd: false
+      })
+    ).rejects.toThrow("Copilot CLI not logged in. Run `copilot` then `/login` to authenticate.");
+    expect(hub.session.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails nested generation when the hub produces no content", async () => {
+    const hub = createMockSession();
+    mockClient([hub.session]);
+    mockSdkTools();
+
+    hub.session.sendAndWait.mockResolvedValue(undefined);
+
+    await expect(
+      generateNestedInstructions({
+        repoPath: tmpDir,
+        detailDir: ".agents",
+        claudeMd: false
+      })
+    ).rejects.toThrow("No AGENTS.md hub content was generated.");
+  });
+
+  it("treats nested detail auth failures as fatal", async () => {
+    const hub = createMockSession();
+    const detail = createMockSession();
+    const { createSession } = mockClient([hub.session, detail.session]);
+    mockSdkTools();
+
+    hub.session.sendAndWait.mockImplementation(async () => {
+      const [config] = createSession.mock.calls[0] as unknown as [
+        { tools: Array<{ handler: Function }> }
+      ];
+      await config.tools[0].handler({
+        content:
+          '```markdown\n# Hub\n\nOverview\n\n```json\n[{"slug":"testing","title":"Testing","description":"How to test"}]\n```\n```'
+      });
+    });
+    detail.session.sendAndWait.mockImplementation(async () => {
+      detail.emit({
+        type: "session.error",
+        data: { message: "authentication required" }
+      });
+    });
+
+    await expect(
+      generateNestedInstructions({
+        repoPath: tmpDir,
+        detailDir: ".agents",
+        claudeMd: false
+      })
+    ).rejects.toThrow("Copilot CLI not logged in. Run `copilot` then `/login` to authenticate.");
   });
 });

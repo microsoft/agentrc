@@ -1,13 +1,15 @@
 import fs from "fs/promises";
 import path from "path";
 
+import type { PermissionHandler, Tool } from "@github/copilot-sdk";
+
 import { DEFAULT_MODEL } from "../config";
 import { ensureDir, safeWriteFile } from "../utils/fs";
 
 import type { Area, InstructionStrategy } from "./analyzer";
 import { sanitizeAreaName } from "./analyzer";
 import { assertCopilotCliReady } from "./copilot";
-import { createCopilotClient } from "./copilotSdk";
+import { createCopilotClient, loadCopilotSdk } from "./copilotSdk";
 import type { FileAction } from "./generator";
 
 type CopilotClient = Awaited<ReturnType<typeof createCopilotClient>>;
@@ -167,6 +169,123 @@ export function buildExistingInstructionsSection(ctx: ExistingInstructionsContex
   return lines.join("\n");
 }
 
+/**
+ * Strip outer markdown code fences that LLMs sometimes wrap around generated file content.
+ * Only removes a single outer fence (```markdown or bare ```) — internal fences are preserved.
+ */
+export function stripMarkdownFences(content: string): string {
+  const trimmed = content.trim();
+  // Match an opening fence at the very start and a closing fence at the very end.
+  // The opening fence may specify a language tag (e.g. ```markdown).
+  const fenceRe = /^```(?:markdown|md)?[ \t]*\n([\s\S]*?)\n```[ \t]*$/;
+  const match = fenceRe.exec(trimmed);
+  return match ? match[1].trim() : trimmed;
+}
+
+/**
+ * Create a custom SDK tool that captures emitted file content into a closure.
+ * The agent calls this tool instead of outputting content in chat, giving us
+ * structured content free of commentary and code-fence wrapping.
+ */
+async function createEmitTool(): Promise<{
+  tool: Tool<{ content: string }>;
+  getContent: () => string | undefined;
+}> {
+  const sdk = await loadCopilotSdk();
+  let captured: string | undefined;
+  const tool = sdk.defineTool("emit_file_content", {
+    description:
+      "Emit the complete generated file content. Call this tool exactly once " +
+      "with the full markdown content of the file you were asked to generate. " +
+      "Do NOT output the content in chat — use this tool instead.",
+    parameters: {
+      type: "object",
+      properties: {
+        content: {
+          type: "string",
+          description: "The complete markdown file content to emit"
+        }
+      },
+      required: ["content"]
+    },
+    handler: (args: { content: string }) => {
+      captured = args.content;
+      return "Content captured successfully.";
+    }
+  });
+  return { tool, getContent: () => captured };
+}
+
+const INSTRUCTION_GENERATION_EXCLUDED_TOOLS = [
+  "edit_file",
+  "create_file",
+  "bash",
+  "str_replace_editor"
+];
+
+const READ_ONLY_PERMISSION_HANDLER: PermissionHandler = (request) => {
+  if (request.kind === "read" || request.kind === "custom-tool") {
+    return { kind: "approved" };
+  }
+
+  return {
+    kind: "denied-no-approval-rule-and-could-not-request-from-user"
+  };
+};
+
+function getSessionError(errorMsg: string): Error {
+  if (errorMsg.toLowerCase().includes("auth") || errorMsg.toLowerCase().includes("login")) {
+    return new Error("Copilot CLI not logged in. Run `copilot` then `/login` to authenticate.");
+  }
+
+  return new Error(errorMsg);
+}
+
+function isCopilotAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("Copilot CLI not logged in.");
+}
+
+function resolveAreaWorkingDirectory(repoPath: string, area?: Area): string {
+  const repoRoot = path.resolve(repoPath);
+  const rawWorkingDirectory = area?.workingDirectory ?? area?.path;
+  if (!rawWorkingDirectory) return repoRoot;
+
+  const resolved = area?.workingDirectory
+    ? path.resolve(repoRoot, rawWorkingDirectory)
+    : path.isAbsolute(rawWorkingDirectory)
+      ? path.resolve(rawWorkingDirectory)
+      : path.resolve(repoRoot, rawWorkingDirectory);
+
+  if (resolved !== repoRoot && !resolved.startsWith(repoRoot + path.sep)) {
+    throw new Error(`Invalid workingDirectory "${rawWorkingDirectory}": escapes repo boundary`);
+  }
+
+  return resolved;
+}
+
+/**
+ * Try to set autopilot mode on a session via the RPC surface.
+ * This is best-effort — the RPC method is public but undocumented,
+ * so we swallow errors silently.
+ */
+type SessionWithRpc = { rpc: { mode: { set: (p: { mode: string }) => Promise<unknown> } } };
+
+async function trySetAutopilot(
+  session: Awaited<ReturnType<CopilotClient["createSession"]>>
+): Promise<void> {
+  try {
+    await (session as unknown as SessionWithRpc).rpc.mode.set({ mode: "autopilot" });
+  } catch {
+    // Autopilot mode is best-effort; ignore failures.
+  }
+}
+
+/** Resolve final content: prefer tool-captured content, fall back to chat stream, apply fence stripping. */
+function resolveContent(emitContent: string | undefined, chatContent: string): string {
+  const raw = emitContent ?? chatContent;
+  return stripMarkdownFences(raw);
+}
+
 type GenerateInstructionsOptions = {
   repoPath: string;
   model?: string;
@@ -198,8 +317,10 @@ export async function generateCopilotInstructions(
     const preferredModel = options.model ?? DEFAULT_MODEL;
 
     const systemContent = hasExistingInstructions
-      ? "You are an expert codebase analyst. Your task is to generate a concise .github/copilot-instructions.md that complements existing instruction files. Use the available tools (glob, view, grep) to explore the codebase. Output ONLY the final markdown content, no explanations."
-      : "You are an expert codebase analyst. Your task is to generate a concise .github/copilot-instructions.md file. Use the available tools (glob, view, grep) to explore the codebase. Output ONLY the final markdown content, no explanations.";
+      ? "You are an expert codebase analyst. Your task is to generate a concise .github/copilot-instructions.md that complements existing instruction files. Use the available tools (glob, view, grep) to explore the codebase. When done, call the emit_file_content tool with the final markdown."
+      : "You are an expert codebase analyst. Your task is to generate a concise .github/copilot-instructions.md file. Use the available tools (glob, view, grep) to explore the codebase. When done, call the emit_file_content tool with the final markdown.";
+
+    const { tool: emitTool, getContent } = await createEmitTool();
 
     const session = await client.createSession({
       model: preferredModel,
@@ -208,8 +329,13 @@ export async function generateCopilotInstructions(
       systemMessage: {
         content: systemContent
       },
+      tools: [emitTool],
+      excludedTools: INSTRUCTION_GENERATION_EXCLUDED_TOOLS,
+      onPermissionRequest: READ_ONLY_PERMISSION_HANDLER,
       infiniteSessions: { enabled: false }
     });
+
+    await trySetAutopilot(session);
 
     let content = "";
     let sessionError: Error | undefined;
@@ -228,11 +354,7 @@ export async function generateCopilotInstructions(
         progress(`Using tool: ${toolName ?? "..."}`);
       } else if (e.type === "session.error") {
         const errorMsg = (e.data?.message as string) ?? "Unknown error";
-        if (errorMsg.toLowerCase().includes("auth") || errorMsg.toLowerCase().includes("login")) {
-          sessionError = new Error(
-            "Copilot CLI not logged in. Run `copilot` then `/login` to authenticate."
-          );
-        }
+        sessionError = getSessionError(errorMsg);
       }
     });
 
@@ -252,7 +374,7 @@ Generate concise instructions (~20-50 lines) covering:
 - Key files/directories
 - Monorepo structure and per-app layout (if this is a monorepo, describe the workspace organization, how apps relate to each other, and any shared libraries)
 ${existingSection}
-Output ONLY the markdown content for the instructions file, not wrapped in markdown code fences.`;
+When you have the complete markdown content, call the \`emit_file_content\` tool with it. Do NOT output the file content directly in chat.`;
 
     progress("Analyzing codebase...");
     let sendError: unknown;
@@ -267,7 +389,7 @@ Output ONLY the markdown content for the instructions file, not wrapped in markd
     if (sendError !== undefined)
       throw sendError instanceof Error ? sendError : new Error(String(sendError));
 
-    return content.trim() || "";
+    return resolveContent(getContent(), content) || "";
   } finally {
     await client.stop();
   }
@@ -308,18 +430,25 @@ export async function generateAreaInstructions(
     const preferredModel = options.model ?? DEFAULT_MODEL;
 
     const areaSystemContent = hasExistingInstructions
-      ? `You are an expert codebase analyst. Your task is to generate a concise .instructions.md file for a specific area of a codebase. This file will be used as a file-based custom instruction in VS Code Copilot, automatically applied when working on files matching certain patterns. This file should complement, not duplicate, existing instruction files. Use the Explore subagents and read-only tools to explore the codebase. Output ONLY the final markdown content, not wrapped in markdown code fences.`
-      : `You are an expert codebase analyst. Your task is to generate a concise .instructions.md file for a specific area of a codebase. This file will be used as a file-based custom instruction in VS Code Copilot, automatically applied when working on files matching certain patterns. Use the Explore subagents and read-only tools to explore the codebase. Output ONLY the final markdown content, not wrapped in markdown code fences.`;
+      ? `You are an expert codebase analyst. Your task is to generate a concise .instructions.md file for a specific area of a codebase. This file will be used as a file-based custom instruction in VS Code Copilot, automatically applied when working on files matching certain patterns. This file should complement, not duplicate, existing instruction files. Use the Explore subagents and read-only tools to explore the codebase. When done, call the emit_file_content tool with the final markdown.`
+      : `You are an expert codebase analyst. Your task is to generate a concise .instructions.md file for a specific area of a codebase. This file will be used as a file-based custom instruction in VS Code Copilot, automatically applied when working on files matching certain patterns. Use the Explore subagents and read-only tools to explore the codebase. When done, call the emit_file_content tool with the final markdown.`;
+
+    const { tool: emitTool, getContent } = await createEmitTool();
 
     const session = await client.createSession({
       model: preferredModel,
       streaming: true,
-      workingDirectory: repoPath,
+      workingDirectory: resolveAreaWorkingDirectory(repoPath, area),
       systemMessage: {
         content: areaSystemContent
       },
+      tools: [emitTool],
+      excludedTools: INSTRUCTION_GENERATION_EXCLUDED_TOOLS,
+      onPermissionRequest: READ_ONLY_PERMISSION_HANDLER,
       infiniteSessions: { enabled: false }
     });
+
+    await trySetAutopilot(session);
 
     let content = "";
     let sessionError: Error | undefined;
@@ -337,11 +466,7 @@ export async function generateAreaInstructions(
         progress(`${area.name}: using tool ${toolName ?? "..."}`);
       } else if (e.type === "session.error") {
         const errorMsg = (e.data?.message as string) ?? "Unknown error";
-        if (errorMsg.toLowerCase().includes("auth") || errorMsg.toLowerCase().includes("login")) {
-          sessionError = new Error(
-            "Copilot CLI not logged in. Run `copilot` then `/login` to authenticate."
-          );
-        }
+        sessionError = getSessionError(errorMsg);
       }
     });
 
@@ -367,7 +492,7 @@ IMPORTANT:
 - Do NOT repeat repo-wide information (that goes in the root copilot-instructions.md)
 - Keep it complementary to root instructions
 ${existingSection ? `- Do NOT duplicate content already covered by existing instruction files\n${existingSection}` : ""}
-- Output ONLY the markdown content, no YAML frontmatter, no code fences`;
+- When you have the complete markdown content, call the \`emit_file_content\` tool with it. Do NOT output the file content directly in chat.`;
 
     progress(`Analyzing area "${area.name}"...`);
     let sendError: unknown;
@@ -382,7 +507,7 @@ ${existingSection ? `- Do NOT duplicate content already covered by existing inst
     if (sendError !== undefined)
       throw sendError instanceof Error ? sendError : new Error(String(sendError));
 
-    return content.trim() || "";
+    return resolveContent(getContent(), content) || "";
   } finally {
     await client.stop();
   }
@@ -609,19 +734,27 @@ async function generateNestedHub(
   const existingCtx = await detectExistingInstructions(options.repoPath, options.detailDir);
   const existingSection = buildExistingInstructionsSection(existingCtx);
 
+  const { tool: emitTool, getContent } = await createEmitTool();
+
   const session = await client.createSession({
     model,
     streaming: true,
-    workingDirectory: options.repoPath,
+    workingDirectory: resolveAreaWorkingDirectory(options.repoPath, options.area),
     systemMessage: {
       content: options.area
-        ? `You are an expert codebase analyst. Generate a lean AGENTS.md hub file for the "${options.area.name}" area. Use tools to explore the codebase. Output ONLY the final markdown content.`
-        : "You are an expert codebase analyst. Generate a lean AGENTS.md hub file for this repository. Use tools to explore the codebase. Output ONLY the final markdown content."
+        ? `You are an expert codebase analyst. Generate a lean AGENTS.md hub file for the "${options.area.name}" area. Use tools to explore the codebase. When done, call the emit_file_content tool with the final markdown.`
+        : "You are an expert codebase analyst. Generate a lean AGENTS.md hub file for this repository. Use tools to explore the codebase. When done, call the emit_file_content tool with the final markdown."
     },
+    tools: [emitTool],
+    excludedTools: INSTRUCTION_GENERATION_EXCLUDED_TOOLS,
+    onPermissionRequest: READ_ONLY_PERMISSION_HANDLER,
     infiniteSessions: { enabled: false }
   });
 
+  await trySetAutopilot(session);
+
   let content = "";
+  let sessionError: Error | undefined;
   session.on((event) => {
     const e = event as { type: string; data?: Record<string, unknown> };
     if (e.type === "assistant.message_delta") {
@@ -635,6 +768,9 @@ async function generateNestedHub(
     } else if (e.type === "tool.execution_start") {
       const toolName = e.data?.toolName as string | undefined;
       progress(`Using tool: ${toolName ?? "..."}`);
+    } else if (e.type === "session.error") {
+      const errorMsg = (e.data?.message as string) ?? "Unknown error";
+      sessionError = getSessionError(errorMsg);
     }
   });
 
@@ -671,12 +807,26 @@ IMPORTANT:
 - Keep the hub LEAN — overview and guardrails only, details go in separate files
 - The JSON block will be parsed and removed from the final output
 ${existingSection ? `- Do NOT duplicate content from existing instruction files\n${existingSection}` : ""}
-- Output ONLY markdown content (no code fences wrapping the whole output), ending with the JSON topic block`;
+- When you have the complete markdown content (including the trailing JSON topic block), call the \`emit_file_content\` tool with it. Do NOT output the content directly in chat.`;
 
-  await session.sendAndWait({ prompt }, 180000);
-  await session.destroy();
+  let sendError: unknown;
+  try {
+    await session.sendAndWait({ prompt }, 180000);
+  } catch (err) {
+    sendError = err;
+  } finally {
+    await session.destroy();
+  }
 
-  const { cleanContent, topics } = parseTopicsFromHub(content.trim());
+  if (sessionError) throw sessionError;
+  if (sendError !== undefined)
+    throw sendError instanceof Error ? sendError : new Error(String(sendError));
+
+  const resolved = resolveContent(getContent(), content);
+  const { cleanContent, topics } = parseTopicsFromHub(resolved);
+  if (!cleanContent.trim()) {
+    throw new Error("No AGENTS.md hub content was generated.");
+  }
 
   return { hubContent: cleanContent, topics };
 }
@@ -694,17 +844,25 @@ async function generateNestedDetail(
   const progress = options.onProgress ?? (() => {});
   const model = options.model ?? DEFAULT_MODEL;
 
+  const { tool: emitTool, getContent } = await createEmitTool();
+
   const session = await client.createSession({
     model,
     streaming: true,
-    workingDirectory: options.repoPath,
+    workingDirectory: resolveAreaWorkingDirectory(options.repoPath, options.area),
     systemMessage: {
-      content: `You are an expert codebase analyst. Generate a deep-dive instruction file about "${options.topic.title}". Use tools to explore the codebase. Output ONLY the final markdown content.`
+      content: `You are an expert codebase analyst. Generate a deep-dive instruction file about "${options.topic.title}". Use tools to explore the codebase. When done, call the emit_file_content tool with the final markdown.`
     },
+    tools: [emitTool],
+    excludedTools: INSTRUCTION_GENERATION_EXCLUDED_TOOLS,
+    onPermissionRequest: READ_ONLY_PERMISSION_HANDLER,
     infiniteSessions: { enabled: false }
   });
 
+  await trySetAutopilot(session);
+
   let content = "";
+  let sessionError: Error | undefined;
   session.on((event) => {
     const e = event as { type: string; data?: Record<string, unknown> };
     if (e.type === "assistant.message_delta") {
@@ -716,6 +874,9 @@ async function generateNestedDetail(
     } else if (e.type === "tool.execution_start") {
       const toolName = e.data?.toolName as string | undefined;
       progress(`${options.topic.slug}: using tool ${toolName ?? "..."}`);
+    } else if (e.type === "session.error") {
+      const errorMsg = (e.data?.message as string) ?? "Unknown error";
+      sessionError = getSessionError(errorMsg);
     }
   });
 
@@ -738,12 +899,27 @@ The file should:
 - Include code patterns and examples found in the actual codebase
 - Be specific to this codebase, not generic advice
 
-Output ONLY the markdown content, no code fences wrapping the whole output.`;
+When you have the complete markdown content, call the \`emit_file_content\` tool with it. Do NOT output the content directly in chat.`;
 
-  await session.sendAndWait({ prompt }, 180000);
-  await session.destroy();
+  let sendError: unknown;
+  try {
+    await session.sendAndWait({ prompt }, 180000);
+  } catch (err) {
+    sendError = err;
+  } finally {
+    await session.destroy();
+  }
 
-  return content.trim() || "";
+  if (sessionError) throw sessionError;
+  if (sendError !== undefined)
+    throw sendError instanceof Error ? sendError : new Error(String(sendError));
+
+  const resolved = resolveContent(getContent(), content);
+  if (!resolved.trim()) {
+    throw new Error(`No detail content was generated for "${options.topic.title}".`);
+  }
+
+  return resolved;
 }
 
 /**
@@ -812,6 +988,9 @@ export async function generateNestedInstructions(
           });
         }
       } catch (err) {
+        if (isCopilotAuthError(err)) {
+          throw err;
+        }
         const msg = err instanceof Error ? err.message : String(err);
         result.warnings.push(`Failed to generate detail for "${topic.title}": ${msg}`);
       }

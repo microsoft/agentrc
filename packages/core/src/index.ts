@@ -86,7 +86,8 @@ export {
   writeAreaInstruction,
   writeNestedInstructions,
   detectExistingInstructions,
-  buildExistingInstructionsSection
+  buildExistingInstructionsSection,
+  stripMarkdownFences
 } from "./services/instructions";
 
 export { parsePolicySources, loadPolicy, resolveChain } from "./services/policy";
