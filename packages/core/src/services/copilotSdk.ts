@@ -29,7 +29,7 @@ function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
-export function shouldFallbackToExternalServer(error: unknown): boolean {
+function shouldFallbackToExternalServer(error: unknown): boolean {
   const message = normalizeError(error).message.toLowerCase();
   return (
     message.includes("unknown option '--headless'") ||
@@ -198,9 +198,6 @@ function attachExternalServerCleanup(
   }) as typeof client.stop;
 }
 
-/** Matches Windows .bat/.cmd script files that cannot be spawned directly by Node's child_process. */
-export const BAT_SHIM_PATTERN = /\.(?:bat|cmd)$/iu;
-
 export async function loadCopilotSdk(): Promise<CopilotSdkModule> {
   if (!cachedSdkModule) {
     cachedSdkModule = import("@github/copilot-sdk").catch((error) => {
@@ -225,7 +222,7 @@ export async function createCopilotClient(
   // Windows .bat/.cmd shims can't be spawned directly by Node's child_process.
   // In both cases, skip the SDK-managed attempt and go straight to external server.
   const isNpx = /\bnpx(?:\.cmd)?$/iu.test(cliConfig.cliPath);
-  const isBatShim = process.platform === "win32" && BAT_SHIM_PATTERN.test(cliConfig.cliPath);
+  const isBatShim = process.platform === "win32" && /\.(?:bat|cmd)$/iu.test(cliConfig.cliPath);
 
   if (isNpx || isBatShim) {
     logCopilotDebug(
