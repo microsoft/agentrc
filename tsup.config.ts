@@ -51,7 +51,7 @@ export default defineConfig({
     // Providing a real require via createRequire fixes this for Node built-ins.
     // Use alias (__bannerCreateRequire) to avoid colliding with cli.ts's own
     // `import { createRequire } from "node:module"` in the bundled output.
-    js: '#!/usr/bin/env node\nimport { createRequire as __bannerCreateRequire } from "module";\nconst require = __bannerCreateRequire(import.meta.url);'
+    js: '#!/usr/bin/env node\nimport { createRequire as __bannerCreateRequire } from "node:module";\nconst require = __bannerCreateRequire(import.meta.url);'
   },
   // Keep node_modules as external — they'll be installed via npm
   external: [/^[^./]/],
