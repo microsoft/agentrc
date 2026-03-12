@@ -46,7 +46,12 @@ export default defineConfig({
   sourcemap: true,
   dts: false,
   banner: {
-    js: "#!/usr/bin/env node"
+    // vscode-jsonrpc is CJS and uses require("util") etc. When bundled into
+    // ESM, esbuild's __require polyfill throws because `require` is undefined.
+    // Providing a real require via createRequire fixes this for Node built-ins.
+    // Use alias (__bannerCreateRequire) to avoid colliding with cli.ts's own
+    // `import { createRequire } from "node:module"` in the bundled output.
+    js: '#!/usr/bin/env node\nimport { createRequire as __bannerCreateRequire } from "module";\nconst require = __bannerCreateRequire(import.meta.url);'
   },
   // Keep node_modules as external — they'll be installed via npm
   external: [/^[^./]/],
