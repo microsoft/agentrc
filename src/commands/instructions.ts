@@ -117,6 +117,9 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
                 }))
               );
             }
+            for (const warning of nestedResult.warnings) {
+              if (shouldLog(options)) progress.update(`Warning: ${warning}`);
+            }
           } else {
             const actions = await writeNestedInstructions(repoPath, nestedResult, options.force);
             for (const action of actions) {
@@ -170,10 +173,11 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
 
         if (content) {
           if (options.dryRun) {
-            const relPath = path.relative(process.cwd(), outputPath);
+            const relPath = path.relative(repoPath, outputPath);
+            const displayPath = path.relative(process.cwd(), outputPath);
             const byteCount = Buffer.byteLength(content, "utf8");
             if (shouldLog(options)) {
-              progress.update(`[dry-run] Would write ${relPath} (${byteCount} bytes)`);
+              progress.update(`[dry-run] Would write ${displayPath} (${byteCount} bytes)`);
             }
             if (options.json) {
               dryRunFiles.push({ path: relPath, bytes: byteCount });
@@ -348,7 +352,7 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
               }
               if (options.json) {
                 dryRunFiles.push({
-                  path: path.relative(process.cwd(), areaInstructionPath(repoPath, area)),
+                  path: path.relative(repoPath, areaInstructionPath(repoPath, area)),
                   bytes: Buffer.byteLength(body, "utf8")
                 });
               }
@@ -383,7 +387,7 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
       }
     }
 
-    if (options.dryRun && options.json && dryRunFiles.length > 0) {
+    if (options.dryRun && options.json) {
       outputResult(
         { ok: true, status: "noop" as const, data: { dryRun: true, files: dryRunFiles } },
         true

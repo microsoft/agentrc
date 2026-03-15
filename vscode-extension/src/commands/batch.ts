@@ -9,6 +9,12 @@ export async function batchInstructionsCommand(): Promise<void> {
     vscode.window.showWarningMessage("AgentRC: No workspace folders open.");
     return;
   }
+  if (folders.length === 1) {
+    vscode.window.showInformationMessage(
+      "AgentRC: Only one workspace root — use 'Generate Instructions' instead."
+    );
+    return;
+  }
 
   const model = vscode.workspace.getConfiguration("agentrc").get<string>("model");
 

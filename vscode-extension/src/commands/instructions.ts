@@ -101,7 +101,10 @@ export async function instructionsCommand(): Promise<void> {
     let existing: Record<string, unknown> = {};
     try {
       const raw = await fs.promises.readFile(configPath, "utf-8");
-      existing = JSON.parse(raw);
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        existing = parsed as Record<string, unknown>;
+      }
     } catch (err: unknown) {
       if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
         throw err; // Malformed JSON — bubble to outer non-fatal catch
