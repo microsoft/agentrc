@@ -34,7 +34,10 @@ function shouldFallbackToExternalServer(error: unknown): boolean {
   return (
     message.includes("unknown option '--headless'") ||
     message.includes("unknown option '--no-auto-update'") ||
-    message.includes("copilot cli not found")
+    // SDK's internal CLI resolution couldn't find the binary
+    message.includes("copilot cli not found") ||
+    // Node's spawn() can't execute .bat/.cmd directly on Windows
+    message.includes("spawn einval")
   );
 }
 
@@ -215,12 +218,16 @@ export async function createCopilotClient(
     : cliConfig.cliPath;
   logCopilotDebug(`creating SDK client with cliPath=${desc} useStdio=false`);
 
-  // npx spawns a grandchild process (npx -> node -> copilot) that the SDK
-  // cannot clean up — killing npx leaves the copilot binary running.
-  // Use external server mode where we manage the process tree ourselves.
+  // npx spawns a grandchild (npx → node → copilot) the SDK can't clean up.
+  // Windows .bat/.cmd shims can't be spawned directly by Node's child_process.
+  // In both cases, skip the SDK-managed attempt and go straight to external server.
   const isNpx = /\bnpx(?:\.cmd)?$/iu.test(cliConfig.cliPath);
-  if (isNpx) {
-    logCopilotDebug("npx wrapper detected; using external server mode");
+  const isBatShim = process.platform === "win32" && /\.(?:bat|cmd)$/iu.test(cliConfig.cliPath);
+
+  if (isNpx || isBatShim) {
+    logCopilotDebug(
+      `${isNpx ? "npx wrapper" : ".bat/.cmd shim"} detected; using external server mode directly`
+    );
     const external = await startExternalServer(cliConfig);
     const client = new sdk.CopilotClient({ cliUrl: external.cliUrl });
     try {
