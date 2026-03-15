@@ -256,6 +256,84 @@ describe("analyzeRepo", () => {
     expect(result.packageManager).toBe("nuget");
   });
 
+  it("detects F# language via .fsproj", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "MyProject.fsproj"),
+      '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup></Project>'
+    );
+
+    const result = await analyzeRepo(repoPath);
+    expect(result.languages).toContain("F#");
+    expect(result.frameworks).toContain("Console");
+  });
+
+  it("detects .NET via global.json", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "global.json"),
+      JSON.stringify({ sdk: { version: "8.0.100" } })
+    );
+
+    const result = await analyzeRepo(repoPath);
+    expect(result.languages).toContain("C#");
+  });
+
+  it("detects ASP.NET Core framework from csproj", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "WebApp.csproj"),
+      '<Project Sdk="Microsoft.NET.Sdk.Web"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>'
+    );
+
+    const result = await analyzeRepo(repoPath);
+    expect(result.languages).toContain("C#");
+    expect(result.frameworks).toContain("ASP.NET Core");
+  });
+
+  it("detects xUnit test framework from csproj", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "Tests.csproj"),
+      [
+        '<Project Sdk="Microsoft.NET.Sdk">',
+        "  <ItemGroup>",
+        '    <PackageReference Include="xunit" Version="2.5.0" />',
+        '    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />',
+        "  </ItemGroup>",
+        "</Project>"
+      ].join("\n")
+    );
+
+    const result = await analyzeRepo(repoPath);
+    expect(result.frameworks).toContain("xUnit");
+    expect(result.frameworks).not.toContain("MSTest");
+  });
+
+  it("detects both C# and F# in mixed repo", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "App.csproj"),
+      '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup></Project>'
+    );
+    await fs.writeFile(
+      path.join(repoPath, "Lib.fsproj"),
+      '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>'
+    );
+
+    const result = await analyzeRepo(repoPath);
+    expect(result.languages).toContain("C#");
+    expect(result.languages).toContain("F#");
+  });
+
+  it("detects packages.lock.json as nuget", async () => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(path.join(repoPath, "packages.lock.json"), "{}");
+
+    const result = await analyzeRepo(repoPath);
+    expect(result.packageManager).toBe("nuget");
+  });
+
   it("detects Gradle multi-project", async () => {
     const repoPath = await makeTmpDir();
     await fs.writeFile(

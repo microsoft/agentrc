@@ -57,7 +57,8 @@ const PACKAGE_MANAGERS: Array<{ file: string; name: string }> = [
   { file: "pnpm-lock.yaml", name: "pnpm" },
   { file: "yarn.lock", name: "yarn" },
   { file: "package-lock.json", name: "npm" },
-  { file: "bun.lockb", name: "bun" }
+  { file: "bun.lockb", name: "bun" },
+  { file: "packages.lock.json", name: "nuget" }
 ];
 
 export async function analyzeRepo(repoPath: string): Promise<RepoAnalysis> {
@@ -82,9 +83,17 @@ export async function analyzeRepo(repoPath: string): Promise<RepoAnalysis> {
   const hasRequirements = files.includes("requirements.txt");
   const hasGoMod = files.includes("go.mod");
   const hasCargo = files.includes("Cargo.toml");
-  const hasCsproj = files.some(
-    (f) => f.endsWith(".csproj") || f.endsWith(".sln") || f.endsWith(".slnx")
+  const hasDotnet = files.some(
+    (f) =>
+      f.endsWith(".csproj") ||
+      f.endsWith(".fsproj") ||
+      f.endsWith(".sln") ||
+      f.endsWith(".slnx") ||
+      f === "global.json" ||
+      f === "Directory.Build.props"
   );
+  const hasCsproj = hasDotnet && files.some((f) => f.endsWith(".csproj"));
+  const hasFsproj = files.some((f) => f.endsWith(".fsproj"));
   const hasPomXml = files.includes("pom.xml");
   const hasBuildGradle = files.includes("build.gradle") || files.includes("build.gradle.kts");
   const hasGemfile = files.includes("Gemfile");
@@ -100,7 +109,8 @@ export async function analyzeRepo(repoPath: string): Promise<RepoAnalysis> {
   if (hasPyProject || hasRequirements) analysis.languages.push("Python");
   if (hasGoMod) analysis.languages.push("Go");
   if (hasCargo) analysis.languages.push("Rust");
-  if (hasCsproj) analysis.languages.push("C#");
+  if (hasCsproj || (hasDotnet && !hasFsproj)) analysis.languages.push("C#");
+  if (hasFsproj) analysis.languages.push("F#");
   if (hasPomXml || hasBuildGradle) analysis.languages.push("Java");
   if (hasGemfile) analysis.languages.push("Ruby");
   if (hasComposerJson) analysis.languages.push("PHP");
@@ -118,6 +128,11 @@ export async function analyzeRepo(repoPath: string): Promise<RepoAnalysis> {
       ...(rootPackageJson?.devDependencies ?? {})
     });
     analysis.frameworks.push(...detectFrameworks(deps, files));
+  }
+
+  if (hasDotnet) {
+    const dotnetFrameworks = await detectDotnetFrameworks(repoPath);
+    analysis.frameworks.push(...dotnetFrameworks);
   }
 
   const workspace = await detectWorkspace(repoPath, files, rootPackageJson);
@@ -199,6 +214,63 @@ function detectFrameworks(deps: string[], files: string[]): string[] {
   if (deps.includes("express")) frameworks.push("Express");
   if (deps.includes("@nestjs/core")) frameworks.push("NestJS");
   if (deps.includes("fastify")) frameworks.push("Fastify");
+
+  return frameworks;
+}
+
+async function detectDotnetFrameworks(repoPath: string): Promise<string[]> {
+  const projectFiles = await fg("**/*.{csproj,fsproj}", {
+    cwd: repoPath,
+    onlyFiles: true,
+    ignore: ["**/node_modules/**", "**/bin/**", "**/obj/**"]
+  });
+
+  const frameworks: string[] = [];
+  for (const projFile of projectFiles) {
+    try {
+      const content = await fs.readFile(path.join(repoPath, projFile), "utf8");
+      frameworks.push(...parseDotnetProject(content));
+    } catch {
+      // ignore read errors
+    }
+  }
+  return frameworks;
+}
+
+function parseDotnetProject(content: string): string[] {
+  const frameworks: string[] = [];
+  const hasPackage = (pkg: string): boolean => content.includes(`Include="${pkg}"`);
+
+  // SDK-based detection
+  if (content.includes('Sdk="Microsoft.NET.Sdk.Web"')) frameworks.push("ASP.NET Core");
+  if (content.includes('Sdk="Microsoft.NET.Sdk.BlazorWebAssembly"'))
+    frameworks.push("Blazor WebAssembly");
+
+  // Package reference detection
+  if (hasPackage("Microsoft.AspNetCore") || hasPackage("Microsoft.AspNetCore.App"))
+    frameworks.push("ASP.NET Core");
+  if (hasPackage("Microsoft.AspNetCore.Components")) frameworks.push("Blazor");
+  if (hasPackage("Microsoft.EntityFrameworkCore")) frameworks.push("Entity Framework");
+  if (hasPackage("Microsoft.Maui.Controls")) frameworks.push(".NET MAUI");
+  if (hasPackage("Xamarin.Forms") || hasPackage("Xamarin.Essentials")) frameworks.push("Xamarin");
+
+  // Project property detection
+  if (content.includes("<UseWPF>true</UseWPF>")) frameworks.push("WPF");
+  if (content.includes("<UseWindowsForms>true</UseWindowsForms>")) frameworks.push("Windows Forms");
+
+  // Test framework detection
+  if (hasPackage("xunit") || hasPackage("xunit.core")) frameworks.push("xUnit");
+  if (hasPackage("NUnit") || hasPackage("nunit.framework")) frameworks.push("NUnit");
+  if (hasPackage("MSTest.TestFramework")) frameworks.push("MSTest");
+
+  // Console app fallback
+  if (
+    frameworks.length === 0 &&
+    content.includes("<OutputType>Exe</OutputType>") &&
+    content.includes('Sdk="Microsoft.NET.Sdk"')
+  ) {
+    frameworks.push("Console");
+  }
 
   return frameworks;
 }

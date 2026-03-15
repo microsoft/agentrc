@@ -363,7 +363,7 @@ export async function generateCopilotInstructions(
 
 Fan out multiple Explore subagents to map out the codebase in parallel:
 1. Check for existing instruction files: glob for **/{.github/copilot-instructions.md,AGENT.md,CLAUDE.md,.cursorrules,README.md}
-2. Identify the tech stack: look at package.json, tsconfig.json, pyproject.toml, Cargo.toml, go.mod, *.csproj, *.sln, build.gradle, pom.xml, etc.
+2. Identify the tech stack: look at package.json, tsconfig.json, pyproject.toml, Cargo.toml, go.mod, *.csproj, *.fsproj, *.sln, global.json, build.gradle, pom.xml, etc.
 3. Understand the structure: list key directories
 4. Detect monorepo structures: check for workspace configs (npm/pnpm/yarn workspaces, Cargo.toml [workspace], go.work, .sln solution files, settings.gradle include directives, pom.xml modules)
 
