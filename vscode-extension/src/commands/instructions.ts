@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import path from "node:path";
+import fs from "node:fs";
 import {
   generateCopilotInstructions,
   generateAreaInstructions,
@@ -12,7 +13,7 @@ import {
   loadAgentrcConfig
 } from "../services.js";
 import { VscodeProgressReporter } from "../progress.js";
-import { getWorkspacePath, getCachedAnalysis, setCachedAnalysis } from "./analyze.js";
+import { pickWorkspacePath, getCachedAnalysis, setCachedAnalysis } from "./analyze.js";
 
 const FORMAT_OPTIONS = [
   {
@@ -43,7 +44,7 @@ const STRATEGY_OPTIONS = [
 ];
 
 export async function instructionsCommand(): Promise<void> {
-  const workspacePath = getWorkspacePath();
+  const workspacePath = await pickWorkspacePath();
   if (!workspacePath) return;
 
   const model = vscode.workspace.getConfiguration("agentrc").get<string>("model");
@@ -94,6 +95,37 @@ export async function instructionsCommand(): Promise<void> {
     if (claudePick) claudeMd = claudePick.value;
   }
 
+  // Write strategy choice back to agentrc.config.json
+  try {
+    const configPath = path.join(workspacePath, "agentrc.config.json");
+    let existing: Record<string, unknown> = {};
+    try {
+      const raw = await fs.promises.readFile(configPath, "utf-8");
+      existing = JSON.parse(raw);
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw err; // Malformed JSON — bubble to outer non-fatal catch
+      }
+    }
+    if (
+      existing.strategy !== strategy ||
+      existing.detailDir !== detailDir ||
+      existing.claudeMd !== claudeMd
+    ) {
+      existing.strategy = strategy;
+      if (strategy === "nested") {
+        existing.detailDir = detailDir;
+        existing.claudeMd = claudeMd;
+      } else {
+        delete existing.detailDir;
+        delete existing.claudeMd;
+      }
+      await safeWriteFile(configPath, JSON.stringify(existing, null, 2) + "\n", true);
+    }
+  } catch {
+    // Non-fatal — config write-back failure shouldn't block generation
+  }
+
   // Ensure analysis is available before starting progress
   let analysis = getCachedAnalysis();
   if (!analysis) {
@@ -111,7 +143,12 @@ export async function instructionsCommand(): Promise<void> {
   let selectedAreas: typeof analysis.areas = undefined;
   if (analysis.areas && analysis.areas.length > 0) {
     const picked = await vscode.window.showQuickPick(
-      analysis.areas.map((a) => ({ label: a.name, description: a.description, area: a })),
+      analysis.areas.map((a) => ({
+        label: a.name,
+        description: a.description,
+        detail: Array.isArray(a.applyTo) ? a.applyTo.join(", ") : a.applyTo,
+        area: a
+      })),
       { placeHolder: "Select areas for instructions (or Escape for root only)", canPickMany: true }
     );
     if (picked && picked.length > 0) {

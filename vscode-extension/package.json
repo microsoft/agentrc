@@ -1,7 +1,7 @@
 {
   "name": "agentrc-vscode",
   "displayName": "AgentRC — AI Repository Setup",
-  "description": "Prime repositories for AI-assisted development: generate Copilot instructions, VS Code configs, MCP configs, and evaluate AI agent effectiveness.",
+  "description": "Prime repositories for AI-assisted development: generate instructions, VS Code configs, MCP configs, and evaluate AI agent effectiveness.",
   "version": "0.0.2",
   "publisher": "ms-vscode",
   "license": "MIT",
@@ -42,13 +42,13 @@
       },
       {
         "command": "agentrc.instructions",
-        "title": "Generate Copilot Instructions",
+        "title": "Generate Instructions",
         "category": "AgentRC",
         "icon": "$(edit)"
       },
       {
         "command": "agentrc.readiness",
-        "title": "AI Readiness Report",
+        "title": "Readiness Report",
         "category": "AgentRC",
         "icon": "$(shield)"
       },
@@ -66,7 +66,7 @@
       },
       {
         "command": "agentrc.init",
-        "title": "Initialize Repository",
+        "title": "Init Repository",
         "category": "AgentRC",
         "icon": "$(rocket)"
       },
@@ -75,6 +75,12 @@
         "title": "Create Pull Request",
         "category": "AgentRC",
         "icon": "$(git-pull-request)"
+      },
+      {
+        "command": "agentrc.batchInstructions",
+        "title": "Generate Instructions (All Roots)",
+        "category": "AgentRC",
+        "icon": "$(files)"
       }
     ],
     "viewsContainers": {
@@ -113,7 +119,7 @@
       },
       {
         "view": "agentrc.readiness",
-        "contents": "Score your repo across 9 AI-readiness pillars — from build systems to custom instructions.\n[$(shield) Run Assessment](command:agentrc.readiness)",
+        "contents": "Run readiness report — score your repo across 9 maturity pillars.\n[$(shield) Run Readiness Report](command:agentrc.readiness)",
         "when": "workspaceFolderCount > 0"
       },
       {
@@ -141,7 +147,7 @@
           },
           {
             "id": "instructions",
-            "title": "Generate AI Instructions",
+            "title": "Generate Instructions",
             "description": "Create custom instructions that teach AI about your codebase.\n[$(edit) Generate Instructions](command:agentrc.instructions)",
             "media": {
               "markdown": "resources/walkthrough/instructions.md"
@@ -163,8 +169,8 @@
           },
           {
             "id": "readiness",
-            "title": "Check AI Readiness",
-            "description": "Score your repo across 9 pillars with a visual maturity report.\n[$(shield) Run Assessment](command:agentrc.readiness)",
+            "title": "Run Readiness Report",
+            "description": "Run readiness report — score your repo across 9 maturity pillars.\n[$(shield) Run Readiness Report](command:agentrc.readiness)",
             "media": {
               "markdown": "resources/walkthrough/readiness.md"
             },
@@ -238,6 +244,10 @@
         {
           "command": "agentrc.pr",
           "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "agentrc.batchInstructions",
+          "when": "workspaceFolderCount > 1"
         }
       ],
       "view/title": [

@@ -278,7 +278,7 @@ export function buildCriteria(): ReadinessCriterion[] {
     },
     {
       id: "custom-instructions",
-      title: "Custom AI instructions or agent guidance",
+      title: "Custom instructions or agent guidance",
       pillar: "ai-tooling",
       level: 1,
       scope: "repo",
@@ -290,7 +290,7 @@ export function buildCriteria(): ReadinessCriterion[] {
           return {
             status: "fail",
             reason:
-              "Missing custom AI instructions (e.g. copilot-instructions.md, CLAUDE.md, AGENTS.md, .cursorrules).",
+              "Missing custom instructions (e.g. copilot-instructions.md, CLAUDE.md, AGENTS.md, .cursorrules).",
             evidence: [
               "copilot-instructions.md",
               "CLAUDE.md",
@@ -301,7 +301,7 @@ export function buildCriteria(): ReadinessCriterion[] {
           };
         }
 
-        // Check for file-based instructions (.github/instructions/*.instructions.md)
+        // Check for area instructions (.github/instructions/*.instructions.md)
         const fileBasedInstructions = await hasFileBasedInstructions(context.repoPath);
         const areas = context.analysis.areas ?? [];
 
@@ -310,13 +310,13 @@ export function buildCriteria(): ReadinessCriterion[] {
           if (fileBasedInstructions.length === 0) {
             return {
               status: "pass",
-              reason: `Root instructions found, but no file-based instructions for ${areas.length} detected areas. Run \`agentrc instructions --areas\` to generate.`,
+              reason: `Root instructions found, but no area instructions for ${areas.length} detected areas. Run \`agentrc instructions --areas\` to generate.`,
               evidence: [...rootFound, ...areas.map((a) => `${a.name}: missing .instructions.md`)]
             };
           }
           return {
             status: "pass",
-            reason: `Root + ${fileBasedInstructions.length} file-based instruction(s) found.`,
+            reason: `Root + ${fileBasedInstructions.length} area instruction(s) found.`,
             evidence: [...rootFound, ...fileBasedInstructions]
           };
         }

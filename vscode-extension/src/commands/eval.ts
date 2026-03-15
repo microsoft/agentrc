@@ -8,12 +8,12 @@ import {
   DEFAULT_MODEL
 } from "../services.js";
 import { VscodeProgressReporter } from "../progress.js";
-import { getWorkspacePath, getCachedAnalysis, setCachedAnalysis } from "./analyze.js";
+import { pickWorkspacePath, getCachedAnalysis, setCachedAnalysis } from "./analyze.js";
 import { createWebviewPanel } from "../webview.js";
 import fs from "node:fs";
 
 export async function evalCommand(): Promise<void> {
-  const workspacePath = getWorkspacePath();
+  const workspacePath = await pickWorkspacePath();
   if (!workspacePath) return;
 
   const configPath = path.join(workspacePath, "agentrc.eval.json");
@@ -68,7 +68,7 @@ export async function evalCommand(): Promise<void> {
 }
 
 export async function evalInitCommand(): Promise<void> {
-  const workspacePath = getWorkspacePath();
+  const workspacePath = await pickWorkspacePath();
   if (!workspacePath) return;
 
   const config = vscode.workspace.getConfiguration("agentrc");

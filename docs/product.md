@@ -10,7 +10,7 @@ This gap widens at scale. An organization with hundreds of repos can't manually 
 
 - **Platform engineering teams** rolling out AI coding tools across an org — need to assess readiness, set baselines, and track adoption at scale.
 - **Individual developers** who want their AI agent to understand their repo's stack, conventions, and architecture from day one.
-- **Engineering leadership** evaluating AI readiness across portfolios, with quantifiable maturity levels and policy-driven compliance.
+- **Engineering leadership** evaluating readiness across portfolios, with quantifiable maturity levels and policy-driven compliance.
 
 ## What AgentRC Does
 
@@ -33,7 +33,7 @@ AgentRC's readiness assessment maps repos to a 5-level maturity model:
 | Level | Name         | What it means                                       |
 | ----- | ------------ | --------------------------------------------------- |
 | 1     | Functional   | Builds, tests, basic tooling in place               |
-| 2     | Documented   | README, CONTRIBUTING, custom AI instructions exist  |
+| 2     | Documented   | README, CONTRIBUTING, custom instructions exist     |
 | 3     | Standardized | CI/CD, security policies, CODEOWNERS, observability |
 | 4     | Optimized    | MCP servers, custom agents, AI skills configured    |
 | 5     | Autonomous   | Full AI-native development with minimal oversight   |

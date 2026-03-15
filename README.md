@@ -10,7 +10,7 @@
 
 AI coding agents are only as effective as the context they receive. AgentRC is a CLI and VS Code extension that closes the gap — from a single repo to hundreds across your org.
 
-**Measure** — Analyze repo structure and score AI readiness across a 5-level maturity model.
+**Measure** — Analyze repo structure and score readiness across a 5-level maturity model.
 **Generate** — Produce tailored instructions, evals, and dev configs using the Copilot SDK.
 **Maintain** — Run evaluations in CI to catch instruction drift as code evolves.
 
@@ -37,7 +37,7 @@ agentrc analyze
 # 2. Check how AI-ready your repo is
 agentrc readiness
 
-# 3. Generate AI instructions
+# 3. Generate instructions
 agentrc instructions
 
 # 4. Generate MCP and VS Code configs
@@ -72,7 +72,7 @@ agentrc analyze --output analysis.md           # save Markdown report
 agentrc analyze --output analysis.json --force # overwrite existing report
 ```
 
-### `agentrc readiness` — Assess AI Readiness
+### `agentrc readiness` — Run Readiness Report
 
 Score a repo across 9 pillars grouped into **Repo Health** and **AI Setup**:
 
@@ -90,29 +90,36 @@ agentrc readiness --fail-level 3         # CI gate: exit 1 if below level 3
 
 **Maturity levels:**
 
-| Level | Name       | What it means                                      |
-| ----- | ---------- | -------------------------------------------------- |
-| 1     | Functional | Builds, tests, basic tooling in place              |
-| 2     | Documented | README, CONTRIBUTING, custom AI instructions exist |
+| Level | Name         | What it means                                       |
+| ----- | ------------ | --------------------------------------------------- |
+| 1     | Functional   | Builds, tests, basic tooling in place               |
+| 2     | Documented   | README, CONTRIBUTING, custom instructions exist     |
+| 3     | Standardized | CI/CD, security policies, CODEOWNERS, observability |
+| 4     | Optimized    | MCP servers, custom agents, AI skills configured    |
+| 5     | Autonomous   | Full AI-native development with minimal oversight   |
 
 At Level 2, AgentRC also checks **instruction consistency** — when a repo has multiple AI instruction files (e.g. `copilot-instructions.md`, `CLAUDE.md`, `AGENTS.md`), it detects whether they diverge. Symlinked or identical files pass; diverging files fail with a similarity score and a suggestion to consolidate.
 
-| 3 | Standardized | CI/CD, security policies, CODEOWNERS, observability |
-| 4 | Optimized | MCP servers, custom agents, AI skills configured |
-| 5 | Autonomous | Full AI-native development with minimal oversight |
-
 ### `agentrc instructions` — Generate Instructions
 
-Generate `copilot-instructions.md` or `AGENTS.md` using the Copilot SDK:
+Generate instructions using the Copilot SDK:
 
 ```bash
 agentrc instructions                      # copilot-instructions.md (default)
-agentrc instructions --format agents-md   # AGENTS.md
-agentrc instructions --per-app            # per-app in monorepos
+agentrc instructions --output AGENTS.md   # custom output path
+agentrc instructions --strategy nested    # nested hub + detail files in .agents/
 agentrc instructions --areas              # root + all detected areas
 agentrc instructions --area frontend      # single area
-agentrc instructions --model claude-sonnet-4.5
+agentrc instructions --areas-only         # areas only (skip root)
+agentrc instructions --dry-run             # preview without writing
+agentrc instructions --model claude-sonnet-4.6
 ```
+
+**Concepts:**
+
+- **Format**: Output file — `copilot-instructions.md` (default) or `AGENTS.md` (via `--output`)
+- **Strategy**: `flat` (single file, default) or `nested` (hub + per-topic detail files)
+- **Scope**: `root only` (default), `--areas` (root + areas), `--area <name>` (single area)
 
 ### `agentrc eval` — Evaluate Instructions
 
@@ -121,11 +128,13 @@ Measure how instructions improve AI responses with a judge model:
 ```bash
 agentrc eval --init                       # scaffold eval config from codebase
 agentrc eval agentrc.eval.json             # run evaluation
-agentrc eval --model gpt-4.1 --judge-model claude-sonnet-4.5
+agentrc eval --model gpt-4.1 --judge-model claude-sonnet-4.6
 agentrc eval --fail-level 80              # CI gate: exit 1 if pass rate < 80%
 ```
 
 ### `agentrc generate` — Generate Configs
+
+> **Note:** `generate instructions` and `generate agents` are deprecated — use `agentrc instructions` directly.
 
 ```bash
 agentrc generate mcp                      # .vscode/mcp.json
@@ -148,9 +157,9 @@ agentrc pr owner/repo-name                # clone → generate → open PR
 agentrc tui
 ```
 
-### `agentrc init` — Guided Setup
+### `agentrc init` — Init Repository
 
-Interactive or headless repo onboarding — detects your stack and walks through readiness, instructions, and config generation. For monorepos, auto-detects workspaces and bootstraps `agentrc.config.json` with workspace and area definitions.
+Interactive or headless repo onboarding — analyzes your stack and generates instructions. For monorepos, auto-detects workspaces and bootstraps `agentrc.config.json` with workspace and area definitions.
 
 ### Global Options
 

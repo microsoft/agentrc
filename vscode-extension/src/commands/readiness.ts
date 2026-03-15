@@ -1,18 +1,24 @@
 import * as vscode from "vscode";
-import { runReadinessReport, generateVisualReport, analyzeRepo } from "../services.js";
+import path from "node:path";
+import {
+  runReadinessReport,
+  generateVisualReport,
+  analyzeRepo,
+  loadAgentrcConfig
+} from "../services.js";
 import { VscodeProgressReporter } from "../progress.js";
-import { getWorkspacePath, getCachedAnalysis, setCachedAnalysis } from "./analyze.js";
+import { pickWorkspacePath, getCachedAnalysis, setCachedAnalysis } from "./analyze.js";
 import { createWebviewPanel } from "../webview.js";
 import { readinessTreeProvider } from "../views/providers.js";
 
 export async function readinessCommand(): Promise<void> {
-  const workspacePath = getWorkspacePath();
+  const workspacePath = await pickWorkspacePath();
   if (!workspacePath) return;
 
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: "AgentRC: Running readiness assessment…",
+      title: "AgentRC: Running readiness report…",
       cancellable: false
     },
     async (progress) => {
@@ -26,22 +32,33 @@ export async function readinessCommand(): Promise<void> {
           setCachedAnalysis(analysis);
         }
 
+        // Load policies from agentrc.config.json
+        let policies: string[] | undefined;
+        try {
+          const config = await loadAgentrcConfig(workspacePath);
+          policies = config?.policies;
+        } catch {
+          // Non-fatal — proceed without policies
+        }
+
         reporter.update("Evaluating readiness pillars…");
-        const report = await runReadinessReport({ repoPath: workspacePath });
+        const report = await runReadinessReport({ repoPath: workspacePath, policies });
 
         reporter.update("Generating report…");
-        const repoName = vscode.workspace.workspaceFolders?.[0]?.name ?? "Repository";
+        const repoName = path.basename(workspacePath);
         const html = generateVisualReport({
           reports: [{ repo: repoName, report }],
-          title: `${repoName} — AI Readiness`
+          title: `${repoName} — Readiness Report`
         });
 
-        createWebviewPanel("agentrc.readinessReport", "AI Readiness Report", html);
+        createWebviewPanel("agentrc.readinessReport", "Readiness Report", html);
         readinessTreeProvider.setReport(report);
-        reporter.succeed(`Readiness: Level ${report.achievedLevel} achieved.`);
+
+        const policyNote = policies?.length ? ` (${policies.length} policy source(s) applied)` : "";
+        reporter.succeed(`Readiness: Level ${report.achievedLevel} achieved.${policyNote}`);
       } catch (err) {
         vscode.window.showErrorMessage(
-          `AgentRC: Readiness assessment failed — ${err instanceof Error ? err.message : String(err)}`
+          `AgentRC: Readiness report failed — ${err instanceof Error ? err.message : String(err)}`
         );
       }
     }

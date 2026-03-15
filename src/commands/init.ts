@@ -283,7 +283,7 @@ export async function initCommand(
       process.stderr.write(`${file.action === "wrote" ? "Wrote" : "Skipped"} ${file.path}\n`);
     }
     process.stderr.write("\nNext steps:\n");
-    process.stderr.write("  agentrc readiness             Check AI readiness across 9 pillars\n");
+    process.stderr.write("  agentrc readiness             Run readiness report across 9 pillars\n");
     if (analysis.areas && analysis.areas.length > 0) {
       process.stderr.write("  agentrc instructions --areas   Generate per-area instructions\n");
     }

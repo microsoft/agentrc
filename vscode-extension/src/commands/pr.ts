@@ -6,11 +6,11 @@ import {
   isAgentrcFile
 } from "../services.js";
 import { getGitHubToken, getAzureDevOpsToken, detectPlatform, type PlatformInfo } from "../auth.js";
-import { getWorkspacePath } from "./analyze.js";
+import { pickWorkspacePath } from "./analyze.js";
 import { getGitRepository } from "../gitUtils.js";
 
 export async function prCommand(): Promise<void> {
-  const workspacePath = getWorkspacePath();
+  const workspacePath = await pickWorkspacePath();
   if (!workspacePath) return;
 
   const repository = getGitRepository(workspacePath);

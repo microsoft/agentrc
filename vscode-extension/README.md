@@ -16,7 +16,7 @@ Detect languages, frameworks, package managers, and monorepo structure. Results 
 
 `AgentRC: Analyze Repository`
 
-### AI Readiness Assessment
+### Readiness Report
 
 Score your repo across **9 pillars** grouped into **Repo Health** and **AI Setup**, with maturity levels from Functional (1) to Autonomous (5).
 
@@ -24,7 +24,7 @@ Score your repo across **9 pillars** grouped into **Repo Health** and **AI Setup
 - Drill-down into criteria in the **Readiness** tree view
 - Pass/fail icons with evidence for each criterion
 
-`AgentRC: AI Readiness Report`
+`AgentRC: Readiness Report`
 
 ### Generate Instructions
 
@@ -35,7 +35,11 @@ Create AI instruction files using the Copilot SDK. Choose your format:
 
 For monorepos, pick specific areas to generate per-area instruction files with `applyTo` scoping.
 
-`AgentRC: Generate Copilot Instructions`
+`AgentRC: Generate Instructions`
+
+In multi-root workspaces, generate instructions for all workspace roots at once.
+
+`AgentRC: Generate Instructions (All Roots)`
 
 ### Generate Configs
 
@@ -76,12 +80,13 @@ Both views show welcome screens with action buttons when no data is loaded yet.
 
 | Setting               | Default             | Description                                        |
 | --------------------- | ------------------- | -------------------------------------------------- |
-| `agentrc.model`       | `claude-sonnet-4.5` | Default Copilot model for generation               |
+| `agentrc.model`       | `claude-sonnet-4.6` | Default Copilot model for generation               |
 | `agentrc.autoAnalyze` | `false`             | Automatically analyze repository on workspace open |
+| `agentrc.judgeModel`  | _(uses model)_      | Copilot model for judging eval responses           |
 
 ## Requirements
 
-- **VS Code 1.100.0+**
+- **VS Code 1.109.0+**
 - **GitHub Copilot Chat extension** (provides the Copilot CLI)
 - **Copilot authentication** — run `copilot` → `/login` in your terminal
 - **GitHub account** — for GitHub PR creation (authenticated via VS Code)

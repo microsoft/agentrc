@@ -25,6 +25,16 @@ export async function generateCommand(
   const repoPath = path.resolve(repoPathArg ?? process.cwd());
 
   if (type === "instructions" || type === "agents") {
+    if (!options.quiet) {
+      process.stderr.write(
+        `⚠ \`generate ${type}\` is deprecated — use \`agentrc instructions\` directly.\n`
+      );
+    }
+    if (options.perApp && !options.quiet) {
+      process.stderr.write(
+        `⚠ --per-app is deprecated — use \`agentrc instructions --areas\` instead.\n`
+      );
+    }
     // Delegate to the canonical instructions command
     const output = type === "agents" ? path.join(repoPath, "AGENTS.md") : undefined;
     await instructionsCommand({

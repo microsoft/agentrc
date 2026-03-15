@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { generateConfigs, analyzeRepo } from "../services.js";
-import { getWorkspacePath, getCachedAnalysis, setCachedAnalysis } from "./analyze.js";
+import { pickWorkspacePath, getCachedAnalysis, setCachedAnalysis } from "./analyze.js";
 
 const GENERATE_OPTIONS = [
   { label: "MCP Config", value: "mcp", description: ".vscode/mcp.json" },
@@ -8,7 +8,7 @@ const GENERATE_OPTIONS = [
 ] as const;
 
 export async function generateCommand(): Promise<void> {
-  const workspacePath = getWorkspacePath();
+  const workspacePath = await pickWorkspacePath();
   if (!workspacePath) return;
 
   const picked = await vscode.window.showQuickPick(

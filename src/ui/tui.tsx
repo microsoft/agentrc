@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 
 import type { RepoApp, Area } from "@agentrc/core/services/analyzer";
-import { analyzeRepo } from "@agentrc/core/services/analyzer";
+import { analyzeRepo, loadAgentrcConfig } from "@agentrc/core/services/analyzer";
 import { getAzureDevOpsToken } from "@agentrc/core/services/azureDevops";
 import { listCopilotModels } from "@agentrc/core/services/copilot";
 import { generateEvalScaffold } from "@agentrc/core/services/evalScaffold";
@@ -16,6 +16,7 @@ import {
   areaInstructionPath,
   writeAreaInstruction
 } from "@agentrc/core/services/instructions";
+import { runReadinessReport, getLevelName } from "@agentrc/core/services/readiness";
 import { safeWriteFile, buildTimestampedName } from "@agentrc/core/utils/fs";
 import { Box, Text, useApp, useInput, useStdout, useIsScreenReaderEnabled } from "ink";
 import type { Key } from "ink";
@@ -36,6 +37,7 @@ type Status =
   | "generating"
   | "bootstrapping"
   | "evaluating"
+  | "readiness-running"
   | "preview"
   | "done"
   | "error"
@@ -191,13 +193,15 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
   const [isMonorepo, setIsMonorepo] = useState(false);
   const [repoAreas, setRepoAreas] = useState<Area[]>([]);
   const [areaCursor, setAreaCursor] = useState(0);
+
   const repoLabel = useMemo(() => path.basename(repoPath), [repoPath]);
   const repoFull = useMemo(() => repoPath, [repoPath]);
   const isLoading =
     status === "generating" ||
     status === "bootstrapping" ||
     status === "evaluating" ||
-    status === "generating-areas";
+    status === "generating-areas" ||
+    status === "readiness-running";
   const isMenu =
     status === "model-pick" ||
     status === "eval-pick" ||
@@ -479,14 +483,14 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
               }
               return;
             }
-            if (input.toLowerCase() === "f") {
+            if (input.toLowerCase() === "n") {
               if (repoAreas.length === 0) {
                 setMessage("No areas detected. Add agentrc.config.json to define areas.");
                 return;
               }
               setAreaCursor(0);
               setStatus("generate-area-pick");
-              setMessage("Generate file-based instructions for areas.");
+              setMessage("Generate nested instructions for areas.");
               return;
             }
             if (key.escape) {
@@ -564,10 +568,7 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
             if (input.toLowerCase() === "a") {
               // All areas
               setStatus("generating-areas");
-              addLog(
-                `Generating file-based instructions for ${repoAreas.length} areas...`,
-                "progress"
-              );
+              addLog(`Generating nested instructions for ${repoAreas.length} areas...`, "progress");
               let written = 0;
               for (const [i, area] of repoAreas.entries()) {
                 setMessage(`Generating for "${area.name}" (${i + 1}/${repoAreas.length})...`);
@@ -590,9 +591,7 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
                 }
               }
               setStatus("done");
-              setMessage(
-                `Generated file-based instructions for ${written}/${repoAreas.length} areas.`
-              );
+              setMessage(`Generated nested instructions for ${written}/${repoAreas.length} areas.`);
               return;
             }
             if (key.upArrow) {
@@ -608,7 +607,7 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
               if (!area) return;
               setStatus("generating-areas");
               setMessage(`Generating for "${area.name}"...`);
-              addLog(`Generating file-based instructions for "${area.name}"...`, "progress");
+              addLog(`Generating nested instructions for "${area.name}"...`, "progress");
               try {
                 const body = await generateAreaInstructions({
                   repoPath,
@@ -789,6 +788,38 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
               return;
             }
 
+            if (input.toLowerCase() === "r") {
+              setStatus("readiness-running");
+              setMessage("Running readiness report…");
+              addLog("Running readiness report…", "progress");
+              try {
+                let policies: string[] | undefined;
+                try {
+                  const config = await loadAgentrcConfig(repoPath);
+                  policies = config?.policies;
+                } catch {
+                  // Non-fatal
+                }
+                const report = await runReadinessReport({ repoPath, policies });
+                const levelName = getLevelName(report.achievedLevel);
+                const failCount = report.criteria.filter((c) => c.status === "fail").length;
+                addLog(
+                  `Level ${report.achievedLevel} (${levelName}) — ${failCount} item(s) to fix`,
+                  "success"
+                );
+                setStatus("done");
+                setMessage(
+                  `Readiness: Level ${report.achievedLevel} (${levelName}). ${failCount} improvement(s) available.`
+                );
+              } catch (error) {
+                const msg = error instanceof Error ? error.message : "Failed.";
+                addLog(`Readiness failed: ${msg}`, "error");
+                setStatus("error");
+                setMessage(`Readiness failed: ${msg}`);
+              }
+              return;
+            }
+
             if (input.toLowerCase() === "b") {
               setStatus("batch-pick");
               setMessage("Select batch provider.");
@@ -874,7 +905,9 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
                 ? "batch"
                 : status === "model-pick"
                   ? "models"
-                  : status;
+                  : status === "readiness-running"
+                    ? "readiness"
+                    : status;
   const statusColor =
     status === "error"
       ? "red"
@@ -1090,14 +1123,10 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
         </>
       )}
 
-      {/* Area picker for file-based instructions */}
+      {/* Area picker for nested instructions */}
       {status === "generate-area-pick" && repoAreas.length > 0 && (
         <>
-          <Divider
-            columns={terminalColumns}
-            label="File-based instructions"
-            accessible={accessible}
-          />
+          <Divider columns={terminalColumns} label="Nested instructions" accessible={accessible} />
           <Box flexDirection="column" paddingLeft={1}>
             {repoAreas.map((area, i) => (
               <Text key={area.name}>
@@ -1215,9 +1244,9 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
           </Box>
         ) : status === "generate-pick" ? (
           <Box>
-            <KeyHint k="C" label="Copilot instructions" />
-            <KeyHint k="A" label="AGENTS.md" />
-            {repoAreas.length > 0 && <KeyHint k="F" label="File-based (areas)" />}
+            <KeyHint k="C" label="Instructions" />
+            <KeyHint k="A" label="Agents" />
+            {repoAreas.length > 0 && <KeyHint k="N" label="Nested (areas)" />}
             <KeyHint k="Esc" label="Back" />
           </Box>
         ) : status === "generate-app-pick" ? (
@@ -1278,6 +1307,7 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
           <Box flexDirection="column">
             <Box>
               <KeyHint k="G" label="Generate" />
+              <KeyHint k="R" label="Readiness" />
               <KeyHint k="E" label="Eval" />
               <KeyHint k="B" label="Batch" />
             </Box>

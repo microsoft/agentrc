@@ -2,7 +2,7 @@
 description: Suggest improvements to the AgentRC CLI project across features, bug fixes, security, performance, and engineering quality.
 ---
 
-You are a senior software engineer reviewing the **AgentRC** project — a TypeScript CLI tool that primes repositories for AI-assisted development by analyzing codebases, generating Copilot instructions and VS Code configs, running evaluations, and producing AI readiness reports.
+You are a senior software engineer reviewing the **AgentRC** project — a TypeScript CLI tool that primes repositories for AI-assisted development by analyzing codebases, generating instructions and VS Code configs, running evaluations, and producing readiness reports.
 
 ## Architecture Context
 
@@ -18,7 +18,7 @@ You are a senior software engineer reviewing the **AgentRC** project — a TypeS
   - `instructions.ts` — Generates `.github/copilot-instructions.md` using Copilot SDK agent sessions
   - `generator.ts` — Writes `.vscode/settings.json` and `.vscode/mcp.json` configs
   - `evaluator.ts` — Runs eval cases comparing agent responses with/without instructions, builds trajectory viewer HTML
-  - `readiness.ts` — Multi-pillar AI readiness assessment (style, build, testing, docs, dev-env, code-quality, observability, security, ai-tooling)
+  - `readiness.ts` — Multi-pillar readiness assessment (style, build, testing, docs, dev-env, code-quality, observability, security, ai-tooling)
   - `visualReport.ts` — Generates beautiful HTML readiness reports with summary cards, pillar charts, level distribution
   - `git.ts` — Clone/branch operations via `simple-git`
   - `github.ts` / `azureDevops.ts` — GitHub (Octokit) and Azure DevOps API integrations
@@ -35,7 +35,7 @@ You are a senior software engineer reviewing the **AgentRC** project — a TypeS
 | `agentrc generate <type>` | Generate `instructions`, `agents`, `mcp`, or `vscode` configs |
 | `agentrc instructions`    | Generate copilot-instructions.md via Copilot SDK              |
 | `agentrc eval`            | Run evaluation cases comparing with/without instructions      |
-| `agentrc readiness`       | AI readiness assessment with optional visual HTML report      |
+| `agentrc readiness`       | Readiness assessment with optional visual HTML report         |
 | `agentrc batch`           | Batch process multiple repos across GitHub/Azure orgs         |
 | `agentrc batch-readiness` | Batch readiness reports across multiple repos                 |
 | `agentrc pr`              | Automate branch/PR creation for generated configs             |

@@ -7,6 +7,7 @@ import {
   generateAreaInstructions,
   generateNestedInstructions,
   generateNestedAreaInstructions,
+  areaInstructionPath,
   writeAreaInstruction,
   writeNestedInstructions
 } from "@agentrc/core/services/instructions";
@@ -37,6 +38,7 @@ type InstructionsOptions = {
   area?: string;
   strategy?: string;
   claudeMd?: boolean;
+  dryRun?: boolean;
 };
 
 export async function instructionsCommand(options: InstructionsOptions): Promise<void> {
@@ -71,6 +73,8 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
   }
 
   try {
+    const dryRunFiles: { path: string; bytes: number }[] = [];
+
     // Generate root instructions unless --areas-only
     if (!options.areasOnly && !options.area) {
       if (strategy === "nested") {
@@ -84,25 +88,56 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
             detailDir,
             claudeMd
           });
-          const actions = await writeNestedInstructions(repoPath, nestedResult, options.force);
-          for (const action of actions) {
-            const relPath = path.relative(process.cwd(), action.path);
-            if (action.action === "wrote") {
-              if (shouldLog(options)) progress.succeed(`Wrote ${relPath}`);
-            } else if (shouldLog(options)) {
-              progress.update(`Skipped ${relPath} (${skipReason(action.action)})`);
+          if (options.dryRun) {
+            const dryFiles = [
+              { path: nestedResult.hub.relativePath, content: nestedResult.hub.content },
+              ...nestedResult.details.map((d) => ({ path: d.relativePath, content: d.content })),
+              ...(nestedResult.claudeMd
+                ? [
+                    {
+                      path: nestedResult.claudeMd.relativePath,
+                      content: nestedResult.claudeMd.content
+                    }
+                  ]
+                : [])
+            ];
+            for (const file of dryFiles) {
+              const relPath = path.relative(process.cwd(), path.join(repoPath, file.path));
+              if (shouldLog(options)) {
+                progress.update(
+                  `[dry-run] Would write ${relPath} (${Buffer.byteLength(file.content, "utf8")} bytes)`
+                );
+              }
             }
-          }
-          for (const warning of nestedResult.warnings) {
-            if (shouldLog(options)) progress.update(`Warning: ${warning}`);
-          }
-          if (options.json) {
-            const result: CommandResult<{ files: typeof actions }> = {
-              ok: true,
-              status: "success",
-              data: { files: actions }
-            };
-            outputResult(result, true);
+            if (options.json) {
+              dryRunFiles.push(
+                ...dryFiles.map((f) => ({
+                  path: f.path,
+                  bytes: Buffer.byteLength(f.content, "utf8")
+                }))
+              );
+            }
+          } else {
+            const actions = await writeNestedInstructions(repoPath, nestedResult, options.force);
+            for (const action of actions) {
+              const relPath = path.relative(process.cwd(), action.path);
+              if (action.action === "wrote") {
+                if (shouldLog(options)) progress.succeed(`Wrote ${relPath}`);
+              } else if (shouldLog(options)) {
+                progress.update(`Skipped ${relPath} (${skipReason(action.action)})`);
+              }
+            }
+            for (const warning of nestedResult.warnings) {
+              if (shouldLog(options)) progress.update(`Warning: ${warning}`);
+            }
+            if (options.json) {
+              const result: CommandResult<{ files: typeof actions }> = {
+                ok: true,
+                status: "success",
+                data: { files: actions }
+              };
+              outputResult(result, true);
+            }
           }
         } catch (error) {
           const msg =
@@ -134,42 +169,54 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
         }
 
         if (content) {
-          await ensureDir(path.dirname(outputPath));
-          const { wrote, reason } = await safeWriteFile(
-            outputPath,
-            content,
-            Boolean(options.force)
-          );
-
-          if (!wrote) {
+          if (options.dryRun) {
             const relPath = path.relative(process.cwd(), outputPath);
-            const why = reason === "symlink" ? "path is a symlink" : "file exists (use --force)";
+            const byteCount = Buffer.byteLength(content, "utf8");
+            if (shouldLog(options)) {
+              progress.update(`[dry-run] Would write ${relPath} (${byteCount} bytes)`);
+            }
             if (options.json) {
-              const result: CommandResult<{ outputPath: string; skipped: true; reason: string }> = {
-                ok: true,
-                status: "noop",
-                data: { outputPath, skipped: true, reason: why }
-              };
-              outputResult(result, true);
-            } else if (shouldLog(options)) {
-              progress.update(`Skipped ${relPath}: ${why}`);
+              dryRunFiles.push({ path: relPath, bytes: byteCount });
             }
           } else {
-            const byteCount = Buffer.byteLength(content, "utf8");
+            await ensureDir(path.dirname(outputPath));
+            const { wrote, reason } = await safeWriteFile(
+              outputPath,
+              content,
+              Boolean(options.force)
+            );
 
-            if (options.json) {
-              const result: CommandResult<{
-                outputPath: string;
-                model: string;
-                byteCount: number;
-              }> = {
-                ok: true,
-                status: "success",
-                data: { outputPath, model: options.model ?? "default", byteCount }
-              };
-              outputResult(result, true);
-            } else if (shouldLog(options)) {
-              progress.succeed(`Updated ${path.relative(process.cwd(), outputPath)}`);
+            if (!wrote) {
+              const relPath = path.relative(process.cwd(), outputPath);
+              const why = reason === "symlink" ? "path is a symlink" : "file exists (use --force)";
+              if (options.json) {
+                const result: CommandResult<{ outputPath: string; skipped: true; reason: string }> =
+                  {
+                    ok: true,
+                    status: "noop",
+                    data: { outputPath, skipped: true, reason: why }
+                  };
+                outputResult(result, true);
+              } else if (shouldLog(options)) {
+                progress.update(`Skipped ${relPath}: ${why}`);
+              }
+            } else {
+              const byteCount = Buffer.byteLength(content, "utf8");
+
+              if (options.json) {
+                const result: CommandResult<{
+                  outputPath: string;
+                  model: string;
+                  byteCount: number;
+                }> = {
+                  ok: true,
+                  status: "success",
+                  data: { outputPath, model: options.model ?? "default", byteCount }
+                };
+                outputResult(result, true);
+              } else if (shouldLog(options)) {
+                progress.succeed(`Updated ${path.relative(process.cwd(), outputPath)}`);
+              }
             }
           }
         }
@@ -211,7 +258,7 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
       }
 
       if (shouldLog(options)) {
-        progress.update(`Generating file-based instructions for ${targetAreas.length} area(s)...`);
+        progress.update(`Generating instructions for ${targetAreas.length} area(s)...`);
       }
 
       for (const area of targetAreas) {
@@ -234,17 +281,48 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
               detailDir,
               claudeMd
             });
-            const actions = await writeNestedInstructions(repoPath, nestedResult, options.force);
-            for (const action of actions) {
-              const relPath = path.relative(process.cwd(), action.path);
-              if (action.action === "wrote") {
-                if (shouldLog(options)) progress.succeed(`Wrote ${relPath}`);
-              } else if (shouldLog(options)) {
-                progress.update(`Skipped ${relPath} (${skipReason(action.action)})`);
+            if (options.dryRun) {
+              const dryFiles = [
+                { path: nestedResult.hub.relativePath, content: nestedResult.hub.content },
+                ...nestedResult.details.map((d) => ({ path: d.relativePath, content: d.content })),
+                ...(nestedResult.claudeMd
+                  ? [
+                      {
+                        path: nestedResult.claudeMd.relativePath,
+                        content: nestedResult.claudeMd.content
+                      }
+                    ]
+                  : [])
+              ];
+              for (const file of dryFiles) {
+                const relPath = path.relative(process.cwd(), path.join(repoPath, file.path));
+                if (shouldLog(options)) {
+                  progress.update(
+                    `[dry-run] Would write ${relPath} (${Buffer.byteLength(file.content, "utf8")} bytes)`
+                  );
+                }
               }
-            }
-            for (const warning of nestedResult.warnings) {
-              if (shouldLog(options)) progress.update(`Warning: ${warning}`);
+              if (options.json) {
+                dryRunFiles.push(
+                  ...dryFiles.map((f) => ({
+                    path: f.path,
+                    bytes: Buffer.byteLength(f.content, "utf8")
+                  }))
+                );
+              }
+            } else {
+              const actions = await writeNestedInstructions(repoPath, nestedResult, options.force);
+              for (const action of actions) {
+                const relPath = path.relative(process.cwd(), action.path);
+                if (action.action === "wrote") {
+                  if (shouldLog(options)) progress.succeed(`Wrote ${relPath}`);
+                } else if (shouldLog(options)) {
+                  progress.update(`Skipped ${relPath} (${skipReason(action.action)})`);
+                }
+              }
+              for (const warning of nestedResult.warnings) {
+                if (shouldLog(options)) progress.update(`Warning: ${warning}`);
+              }
             }
           } else {
             // Flat: existing behavior
@@ -262,21 +340,37 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
               continue;
             }
 
-            const result = await writeAreaInstruction(repoPath, area, body, options.force);
-            if (result.status === "skipped") {
+            if (options.dryRun) {
               if (shouldLog(options)) {
-                progress.update(`Skipped "${area.name}" — file exists (use --force to overwrite).`);
+                progress.update(
+                  `[dry-run] Would write area "${area.name}" (${Buffer.byteLength(body, "utf8")} bytes)`
+                );
               }
-              continue;
-            }
-            if (result.status === "symlink") {
+              if (options.json) {
+                dryRunFiles.push({
+                  path: path.relative(process.cwd(), areaInstructionPath(repoPath, area)),
+                  bytes: Buffer.byteLength(body, "utf8")
+                });
+              }
+            } else {
+              const result = await writeAreaInstruction(repoPath, area, body, options.force);
+              if (result.status === "skipped") {
+                if (shouldLog(options)) {
+                  progress.update(
+                    `Skipped "${area.name}" — file exists (use --force to overwrite).`
+                  );
+                }
+                continue;
+              }
+              if (result.status === "symlink") {
+                if (shouldLog(options)) {
+                  progress.update(`Skipped "${area.name}" — path is a symlink.`);
+                }
+                continue;
+              }
               if (shouldLog(options)) {
-                progress.update(`Skipped "${area.name}" — path is a symlink.`);
+                progress.succeed(`Wrote ${path.relative(process.cwd(), result.filePath)}`);
               }
-              continue;
-            }
-            if (shouldLog(options)) {
-              progress.succeed(`Wrote ${path.relative(process.cwd(), result.filePath)}`);
             }
           }
         } catch (error) {
@@ -287,6 +381,13 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
           }
         }
       }
+    }
+
+    if (options.dryRun && options.json && dryRunFiles.length > 0) {
+      outputResult(
+        { ok: true, status: "noop" as const, data: { dryRun: true, files: dryRunFiles } },
+        true
+      );
     }
 
     if (!wantAreas && shouldLog(options) && !options.json) {

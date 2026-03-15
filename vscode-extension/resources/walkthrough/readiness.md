@@ -1,4 +1,4 @@
-## How AI-Ready Is Your Repo?
+## How Ready Is Your Repo?
 
 AgentRC evaluates your repository across **9 pillars** organized into two groups:
 

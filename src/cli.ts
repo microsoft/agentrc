@@ -53,7 +53,7 @@ export function runCli(argv: string[]): void {
 
   program
     .command("init")
-    .description("Interactive repo setup — analyze, generate instructions and configs")
+    .description("Init repository — analyze & generate instructions")
     .argument("[path]", "Path to a local repository")
     .option("--github", "Use a GitHub repository")
     .option("--provider <provider>", "Repo provider (github|azure)")
@@ -83,7 +83,7 @@ export function runCli(argv: string[]): void {
     )
     .argument("[path]", "Path to a local repository")
     .option("--force", "Overwrite existing files")
-    .option("--per-app", "Generate per-app in monorepos")
+    .option("--per-app", "(deprecated) Use `agentrc instructions --areas` instead")
     .option("--model <name>", "Model for instructions generation", DEFAULT_MODEL)
     .option("--strategy <mode>", "Instruction strategy (flat or nested)")
     .action(withGlobalOpts(generateCommand));
@@ -120,21 +120,22 @@ export function runCli(argv: string[]): void {
 
   program
     .command("instructions")
-    .description("Generate root and per-area AI instruction files")
+    .description("Generate instructions for the repository")
     .option("--repo <path>", "Repository path", process.cwd())
-    .option("--output <path>", "Output path for copilot instructions")
+    .option("--output <path>", "Output path for instructions")
     .option("--model <name>", "Model for instructions generation", DEFAULT_MODEL)
     .option("--force", "Overwrite existing area instruction files")
-    .option("--areas", "Also generate file-based instructions for detected areas")
-    .option("--areas-only", "Generate only file-based area instructions (skip root)")
-    .option("--area <name>", "Generate file-based instructions for a specific area")
+    .option("--areas", "Also generate instructions for detected areas")
+    .option("--areas-only", "Generate only area instructions (skip root)")
+    .option("--area <name>", "Generate instructions for a specific area")
     .option("--strategy <mode>", "Instruction strategy (flat or nested)")
     .option("--claude-md", "Generate CLAUDE.md files alongside AGENTS.md (nested strategy)")
+    .option("--dry-run", "Preview generated files without writing anything")
     .action(withGlobalOpts(instructionsCommand));
 
   program
     .command("readiness")
-    .description("AI readiness assessment across 9 maturity pillars")
+    .description("Run readiness report across 9 maturity pillars")
     .argument("[path]", "Path to a local repository")
     .option("--output <path>", "Write report to file (.json, .md, or .html)")
     .option("--force", "Overwrite existing output file")
@@ -156,7 +157,7 @@ export function runCli(argv: string[]): void {
 
   program
     .command("batch-readiness")
-    .description("Generate batch AI readiness report for multiple repos")
+    .description("Run batch readiness report for multiple repos")
     .option("--output <path>", "Write HTML report to file")
     .option("--policy <sources>", "Policy sources (comma-separated: paths, npm packages)")
     .action(withGlobalOpts(batchReadinessCommand));

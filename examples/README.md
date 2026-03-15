@@ -17,7 +17,7 @@ agentrc init /path/to/repo
 # Inspect a repository before generating config or instructions
 agentrc analyze /path/to/repo
 
-# Check AI readiness in the terminal
+# Check readiness in the terminal
 agentrc readiness /path/to/repo
 
 # Generate a visual readiness report

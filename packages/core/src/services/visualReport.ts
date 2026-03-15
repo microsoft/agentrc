@@ -8,11 +8,7 @@ type VisualReportOptions = {
 };
 
 export function generateVisualReport(options: VisualReportOptions): string {
-  const {
-    reports,
-    title = "AI Readiness Report",
-    generatedAt = new Date().toISOString()
-  } = options;
+  const { reports, title = "Readiness Report", generatedAt = new Date().toISOString() } = options;
 
   const successfulReports = reports.filter((r) => !r.error);
   const failedReports = reports.filter((r) => r.error);
@@ -610,7 +606,7 @@ export function generateVisualReport(options: VisualReportOptions): string {
     }
 
     <div class="footer">
-      <p>Generated with <a href="https://github.com/microsoft/agentrc">AgentRC</a> &middot; AI Readiness Tool</p>
+      <p>Generated with <a href="https://github.com/microsoft/agentrc">AgentRC</a> &middot; Readiness Tool</p>
     </div>
   </div>
   <script>

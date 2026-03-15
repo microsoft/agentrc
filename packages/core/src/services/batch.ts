@@ -129,7 +129,7 @@ async function processRepo(params: ProcessRepoParams): Promise<ProcessResult> {
     }
 
     progress?.update(`${label}: Committing...`);
-    await commitAll(repoPath, "chore: add copilot instructions via AgentRC");
+    await commitAll(repoPath, "chore: add instructions via AgentRC");
 
     progress?.update(`${label}: Pushing...`);
     await pushBranch(repoPath, branch, token, provider);
@@ -173,7 +173,7 @@ export async function processGitHubRepo(options: ProcessGitHubRepoOptions): Prom
         token,
         owner: repo.owner,
         repo: repo.name,
-        title: "🤖 Add Copilot instructions via AgentRC",
+        title: "🤖 Add instructions via AgentRC",
         body: buildInstructionsPrBody(),
         head: branchName,
         base: repo.defaultBranch
@@ -210,7 +210,7 @@ export async function processAzureRepo(options: ProcessAzureRepoOptions): Promis
         project: repo.project,
         repoId: repo.id,
         repoName: repo.name,
-        title: "🤖 Add Copilot instructions via AgentRC",
+        title: "🤖 Add instructions via AgentRC",
         body: buildInstructionsPrBody(),
         sourceBranch: branchName,
         targetBranch: repo.defaultBranch
@@ -299,7 +299,7 @@ export type ProcessBatchReadinessRepoOptions = {
 };
 
 /**
- * Clone a single GitHub repo and run the AI-readiness report.
+ * Clone a single GitHub repo and run the readiness report.
  * Credential-stripped clone URL is restored on the remote after cloning.
  * Extracted from BatchReadinessTui so the TUI remains a thin presenter.
  */

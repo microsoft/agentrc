@@ -56,7 +56,7 @@ function makeReport(overrides: Partial<ReadinessReport> = {}): ReadinessReport {
       },
       {
         id: "custom-instructions",
-        title: "Custom AI instructions",
+        title: "Custom instructions",
         pillar: "ai-tooling",
         level: 1,
         scope: "repo",

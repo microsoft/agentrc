@@ -14,7 +14,7 @@ export function setCachedAnalysis(analysis: RepoAnalysis | undefined): void {
 }
 
 export async function analyzeCommand(): Promise<void> {
-  const workspacePath = getWorkspacePath();
+  const workspacePath = await pickWorkspacePath();
   if (!workspacePath) return;
 
   await vscode.window.withProgress(
@@ -32,11 +32,18 @@ export async function analyzeCommand(): Promise<void> {
   );
 }
 
-export function getWorkspacePath(): string | undefined {
-  const folder = vscode.workspace.workspaceFolders?.[0];
-  if (!folder) {
+export async function pickWorkspacePath(): Promise<string | undefined> {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders || folders.length === 0) {
     vscode.window.showWarningMessage("AgentRC: No workspace folder open.");
     return undefined;
   }
-  return folder.uri.fsPath;
+  if (folders.length === 1) {
+    return folders[0].uri.fsPath;
+  }
+  const picked = await vscode.window.showQuickPick(
+    folders.map((f) => ({ label: f.name, description: f.uri.fsPath, fsPath: f.uri.fsPath })),
+    { placeHolder: "Select workspace folder" }
+  );
+  return picked?.fsPath;
 }

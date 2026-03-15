@@ -6,6 +6,7 @@ import { readinessCommand } from "./commands/readiness.js";
 import { evalCommand, evalInitCommand } from "./commands/eval.js";
 import { initCommand } from "./commands/init.js";
 import { prCommand } from "./commands/pr.js";
+import { batchInstructionsCommand } from "./commands/batch.js";
 import { analysisTreeProvider, readinessTreeProvider } from "./views/providers.js";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -81,7 +82,8 @@ export function activate(context: vscode.ExtensionContext): void {
       updateStatusBar();
       vscode.commands.executeCommand("agentrc.analysis.focus");
     }),
-    vscode.commands.registerCommand("agentrc.pr", prCommand)
+    vscode.commands.registerCommand("agentrc.pr", prCommand),
+    vscode.commands.registerCommand("agentrc.batchInstructions", batchInstructionsCommand)
   );
 
   // Auto-analyze on activation if configured

@@ -59,14 +59,14 @@ describe("formatReadinessMarkdown", () => {
         },
         {
           id: "custom-instructions",
-          title: "Custom AI instructions",
+          title: "Custom instructions",
           pillar: "ai-tooling",
           level: 1,
           scope: "repo",
           impact: "high",
           effort: "low",
           status: "fail",
-          reason: "Missing custom AI instructions."
+          reason: "Missing custom instructions."
         }
       ],
       extras: [
@@ -79,7 +79,7 @@ describe("formatReadinessMarkdown", () => {
 
   it("renders heading with repo name and level", () => {
     const md = formatReadinessMarkdown(makeReport(), "my-repo");
-    expect(md).toContain("# AI Readiness Report: my-repo");
+    expect(md).toContain("# Readiness Report: my-repo");
     expect(md).toContain("**Level 1** — Functional");
   });
 
@@ -112,12 +112,12 @@ describe("formatReadinessMarkdown", () => {
     const md = formatReadinessMarkdown(makeReport(), "my-repo");
     expect(md).toContain("## Fix First");
     expect(md).toContain("README present");
-    expect(md).toContain("Custom AI instructions");
+    expect(md).toContain("Custom instructions");
   });
 
   it("includes extras section", () => {
     const md = formatReadinessMarkdown(makeReport(), "my-repo");
-    expect(md).toContain("## AI Readiness Extras");
+    expect(md).toContain("## Readiness Extras");
     expect(md).toContain("✅ AGENTS.md present");
     expect(md).toContain("❌ Architecture guide present");
   });

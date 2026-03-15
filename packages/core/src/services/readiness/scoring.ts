@@ -32,7 +32,7 @@ export function getLevelName(level: number): string {
 export function getLevelDescription(level: number): string {
   const descriptions: Record<number, string> = {
     1: "Repo builds, tests run, and basic tooling (linter, lockfile) is in place. AI agents can clone and get started.",
-    2: "README, CONTRIBUTING guide, and custom AI instructions exist. Agents understand project context and conventions.",
+    2: "README, CONTRIBUTING guide, and custom instructions exist. Agents understand project context and conventions.",
     3: "CI/CD, security policies, CODEOWNERS, and observability are configured. Agents operate within well-defined guardrails.",
     4: "MCP servers, custom agents, and AI skills are set up. Agents have deep integration with project-specific tools and workflows.",
     5: "Full AI-native development: agents can independently plan, implement, test, and ship changes with minimal human oversight."

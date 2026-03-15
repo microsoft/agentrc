@@ -430,8 +430,8 @@ export async function generateAreaInstructions(
     const preferredModel = options.model ?? DEFAULT_MODEL;
 
     const areaSystemContent = hasExistingInstructions
-      ? `You are an expert codebase analyst. Your task is to generate a concise .instructions.md file for a specific area of a codebase. This file will be used as a file-based custom instruction in VS Code Copilot, automatically applied when working on files matching certain patterns. This file should complement, not duplicate, existing instruction files. Use the Explore subagents and read-only tools to explore the codebase. When done, call the emit_file_content tool with the final markdown.`
-      : `You are an expert codebase analyst. Your task is to generate a concise .instructions.md file for a specific area of a codebase. This file will be used as a file-based custom instruction in VS Code Copilot, automatically applied when working on files matching certain patterns. Use the Explore subagents and read-only tools to explore the codebase. When done, call the emit_file_content tool with the final markdown.`;
+      ? `You are an expert codebase analyst. Your task is to generate a concise .instructions.md file for a specific area of a codebase. This file will be used as an area instruction in VS Code, automatically applied when working on files matching certain patterns. This file should complement, not duplicate, existing instruction files. Use the Explore subagents and read-only tools to explore the codebase. When done, call the emit_file_content tool with the final markdown.`
+      : `You are an expert codebase analyst. Your task is to generate a concise .instructions.md file for a specific area of a codebase. This file will be used as an area instruction in VS Code, automatically applied when working on files matching certain patterns. Use the Explore subagents and read-only tools to explore the codebase. When done, call the emit_file_content tool with the final markdown.`;
 
     const { tool: emitTool, getContent } = await createEmitTool();
 
@@ -470,7 +470,7 @@ export async function generateAreaInstructions(
       }
     });
 
-    const prompt = `Analyze the "${area.name}" area of this codebase and generate a file-based instruction file.
+    const prompt = `Analyze the "${area.name}" area of this codebase and generate an area instruction file.
 
 This area covers files matching: ${applyToStr}
 ${area.description ? `Description: ${area.description}` : ""}

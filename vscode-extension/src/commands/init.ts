@@ -7,10 +7,10 @@ import {
   safeWriteFile
 } from "../services.js";
 import { VscodeProgressReporter } from "../progress.js";
-import { getWorkspacePath, setCachedAnalysis } from "./analyze.js";
+import { pickWorkspacePath, setCachedAnalysis } from "./analyze.js";
 
 export async function initCommand(): Promise<void> {
-  const workspacePath = getWorkspacePath();
+  const workspacePath = await pickWorkspacePath();
   if (!workspacePath) return;
 
   const config = vscode.workspace.getConfiguration("agentrc");
@@ -30,7 +30,7 @@ export async function initCommand(): Promise<void> {
         const analysis = await analyzeRepo(workspacePath);
         setCachedAnalysis(analysis);
 
-        reporter.update("Generating Copilot instructions…");
+        reporter.update("Generating instructions…");
         const instructionsContent = await generateCopilotInstructions({
           repoPath: workspacePath,
           model,

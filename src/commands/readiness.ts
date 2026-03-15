@@ -100,7 +100,7 @@ export async function readinessCommand(
   if (options.visual || outputExt === ".html") {
     const html = generateVisualReport({
       reports: [{ repo: repoName, report }],
-      title: `AI Readiness Report: ${repoName}`,
+      title: `Readiness Report: ${repoName}`,
       generatedAt: new Date().toISOString()
     });
 
@@ -215,7 +215,7 @@ function printReadinessChecklist(report: ReadinessReport): void {
   }
 
   if (report.extras.length) {
-    log(chalk.bold("\nAI readiness extras"));
+    log(chalk.bold("\nReadiness extras"));
     for (const extra of report.extras) {
       const icon = extra.status === "pass" ? chalk.green("✔") : chalk.red("✖");
       log(`${icon} ${extra.title}`);
@@ -295,7 +295,7 @@ function printAreaBreakdown(areaReports: AreaReadinessReport[]): void {
 export function formatReadinessMarkdown(report: ReadinessReport, repoName: string): string {
   const lines: string[] = [];
 
-  lines.push(`# AI Readiness Report: ${repoName}`);
+  lines.push(`# Readiness Report: ${repoName}`);
   lines.push("");
   lines.push(`**Level ${report.achievedLevel}** — ${levelName(report.achievedLevel)}`);
   lines.push("");
@@ -336,7 +336,7 @@ export function formatReadinessMarkdown(report: ReadinessReport, repoName: strin
 
   // Extras
   if (report.extras.length > 0) {
-    lines.push("## AI Readiness Extras");
+    lines.push("## Readiness Extras");
     lines.push("");
     for (const extra of report.extras) {
       const icon = extra.status === "pass" ? "✅" : "❌";

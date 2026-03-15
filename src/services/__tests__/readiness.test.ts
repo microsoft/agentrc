@@ -230,7 +230,7 @@ describe("runReadinessReport", () => {
       expect(criterion?.status).toBe("pass");
     });
 
-    it("mentions missing file-based instructions when areas detected", async () => {
+    it("mentions missing area instructions when areas detected", async () => {
       await writePackageJson({ name: "test-repo" });
       await writeFile(".github/copilot-instructions.md", "# Instructions");
       // Create a heuristic area directory
@@ -240,18 +240,18 @@ describe("runReadinessReport", () => {
       const criterion = report.criteria.find((c) => c.id === "custom-instructions");
 
       expect(criterion?.status).toBe("pass");
-      expect(criterion?.reason).toContain("no file-based instructions");
+      expect(criterion?.reason).toContain("no area instructions");
       expect(criterion?.evidence).toEqual(
         expect.arrayContaining([expect.stringContaining("missing .instructions.md")])
       );
     });
 
-    it("reports file-based instructions count when present with areas", async () => {
+    it("reports area instructions count when present with areas", async () => {
       await writePackageJson({ name: "test-repo" });
       await writeFile(".github/copilot-instructions.md", "# Instructions");
       // Create a heuristic area directory
       await writeFile("frontend/index.ts", "export {};");
-      // Create a file-based instruction
+      // Create an area instruction
       await writeFile(
         ".github/instructions/frontend.instructions.md",
         "---\napplyTo: frontend/**\n---\n# Frontend"
@@ -261,7 +261,7 @@ describe("runReadinessReport", () => {
       const criterion = report.criteria.find((c) => c.id === "custom-instructions");
 
       expect(criterion?.status).toBe("pass");
-      expect(criterion?.reason).toContain("file-based instruction");
+      expect(criterion?.reason).toContain("area instruction");
       expect(criterion?.evidence).toEqual(
         expect.arrayContaining([expect.stringContaining("frontend.instructions.md")])
       );

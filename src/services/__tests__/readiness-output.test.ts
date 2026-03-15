@@ -44,7 +44,7 @@ describe("readinessCommand --output", () => {
     await readinessCommand(repoPath, { output: outputPath, quiet: true });
 
     const content = await fs.readFile(outputPath, "utf-8");
-    expect(content).toContain("# AI Readiness Report:");
+    expect(content).toContain("# Readiness Report:");
     expect(content).toContain("## Repo Health");
   });
 
@@ -186,7 +186,7 @@ describe("readinessCommand --output", () => {
     expect(parsed.data).toBeDefined();
 
     const fileContent = await fs.readFile(outputPath, "utf-8");
-    expect(fileContent).toContain("# AI Readiness Report:");
+    expect(fileContent).toContain("# Readiness Report:");
   });
 
   it("emits JSON to stdout when --json is used with html output", async () => {

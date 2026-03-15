@@ -150,7 +150,7 @@ export function BatchReadinessTui({ token, outputPath, policies }: Props): React
             },
             error: r.error
           })),
-        title: "Batch AI Readiness Report",
+        title: "Batch Readiness Report",
         generatedAt: new Date().toISOString()
       });
 
