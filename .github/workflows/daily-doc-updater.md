@@ -62,8 +62,10 @@ This is **@microsoft/agentrc** — a TypeScript CLI + VS Code extension for prim
 - `README.md` — Main product overview, Quick Start, prerequisites, command reference
 - `CONTRIBUTING.md` — Contribution workflow, code style, release process
 - `CHANGELOG.md` — Version history
-- `docs/product.md` — Product brief, maturity model, architecture decisions
-- `docs/plugins.md` — Plugin system documentation, architecture, plugin contract
+- `docs/getting-started.md` — Installation, prerequisites, first run walkthrough
+- `docs/concepts.md` — Maturity model, readiness pillars, instructions, evaluation
+- `docs/dev/product.md` — Product brief, maturity model, architecture decisions
+- `docs/dev/plugins.md` — Plugin system documentation, architecture, plugin contract
 - `.github/copilot-instructions.md` — Copilot coding instructions for the repo
 - `.github/instructions/*.instructions.md` — Scoped instructions for specific areas
 - `vscode-extension/README.md` — VS Code extension readme
@@ -141,7 +143,9 @@ For each missing or incomplete documentation:
 
 1. **Determine the correct file** based on the change type:
    - CLI commands/options → `README.md`
-   - Architecture changes → `docs/product.md` or `docs/plugins.md`
+   - Architecture changes → `docs/dev/product.md` or `docs/dev/plugins.md`
+   - User-facing concepts → `docs/concepts.md`
+   - Getting started content → `docs/getting-started.md`
    - Development workflow → `CONTRIBUTING.md`
    - Copilot coding context → `.github/copilot-instructions.md`
    - Area-specific instructions → `.github/instructions/*.instructions.md`
