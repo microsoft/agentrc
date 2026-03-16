@@ -92,7 +92,7 @@ export async function analyzeRepo(repoPath: string): Promise<RepoAnalysis> {
       f === "global.json" ||
       f === "Directory.Build.props"
   );
-  const hasCsproj = hasDotnet && files.some((f) => f.endsWith(".csproj"));
+  const hasCsproj = files.some((f) => f.endsWith(".csproj"));
   const hasFsproj = files.some((f) => f.endsWith(".fsproj"));
   const hasPomXml = files.includes("pom.xml");
   const hasBuildGradle = files.includes("build.gradle") || files.includes("build.gradle.kts");
