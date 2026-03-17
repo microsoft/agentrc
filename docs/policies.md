@@ -49,6 +49,7 @@ Remove checks that don't apply to your stack:
 
 ```json
 {
+  "name": "no-infra-checks",
   "criteria": {
     "disable": ["env-example", "observability", "dependabot"]
   }
@@ -61,6 +62,7 @@ Change impact, level, or title of existing checks:
 
 ```json
 {
+  "name": "custom-weights",
   "criteria": {
     "override": {
       "readme": { "impact": "high", "level": 2 },
@@ -76,6 +78,7 @@ Control the overall pass rate:
 
 ```json
 {
+  "name": "strict-pass-rate",
   "thresholds": {
     "passRate": 0.9
   }
@@ -84,27 +87,13 @@ Control the overall pass rate:
 
 ### Add custom criteria
 
-You can declare new criterion metadata in JSON, but the detection logic requires a TypeScript plugin:
+JSON policies can only customize existing criteria (disable, override, set thresholds). To **add new criteria** with custom detection logic, use a TypeScript/JavaScript policy module passed via `--policy`:
 
-```json
-{
-  "criteria": {
-    "add": [
-      {
-        "id": "custom-check",
-        "title": "My Custom Check",
-        "pillar": "code-quality",
-        "level": 2,
-        "scope": "repo",
-        "impact": "high",
-        "effort": "low"
-      }
-    ]
-  }
-}
+```bash
+agentrc readiness --policy ./my-plugin.ts
 ```
 
-> JSON policies can only customize existing criteria (rename, re-score, enable/disable). To **add new criteria** with custom detection logic, use a TypeScript/JavaScript policy module passed via `--policy`. See [Plugin System](dev/plugins.md) for details.
+See [Plugin System](dev/plugins.md) for the full TypeScript plugin API.
 
 ## Chaining policies
 
@@ -153,6 +142,7 @@ Remove extras that don’t apply:
 
 ```json
 {
+  "name": "skip-extras",
   "extras": {
     "disable": ["agents-doc", "pre-commit"]
   }

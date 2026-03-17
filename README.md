@@ -93,7 +93,7 @@ Works with **GitHub** and **Azure DevOps**. Supports monorepos, multi-root VS Co
 
 **"Copilot CLI not logged in"** — Run `copilot` in your terminal, then `/login`.
 
-**"GitHub auth required"** — `brew install gh && gh auth login`, or set `GITHUB_TOKEN`.
+**"GitHub auth required"** — `brew install gh && gh auth login`, or set `GITHUB_TOKEN` (or `GH_TOKEN`).
 
 **"Azure DevOps auth required"** — Set `AZURE_DEVOPS_PAT` or `AZDO_PAT`.
 
