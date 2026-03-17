@@ -45,10 +45,10 @@ npx github:microsoft/agentrc batch-readiness --output team.html
 
 The HTML report shows per-repo scores, trends, and which repos need attention.
 
-| Flag                 | Default | Description                  |
-| -------------------- | ------- | ---------------------------- |
-| `--output <path>`    |         | Write HTML report            |
-| `--policy <sources>` |         | Comma-separated policy paths |
+| Flag                 | Default | Description                                  |
+| -------------------- | ------- | -------------------------------------------- |
+| `--output <path>`    |         | Write HTML report                            |
+| `--policy <sources>` |         | Comma-separated policy paths or npm packages |
 
 ## Automated PRs
 

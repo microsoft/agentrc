@@ -120,7 +120,7 @@ Both commands output a `CommandResult<T>` envelope when `--json` is set:
 }
 ```
 
-Status values: `"success"`, `"partial"`, `"noop"`, `"error"`. The process exit code is 0 for success and 1 when `--fail-level` is breached.
+Status values: `"success"`, `"partial"`, `"noop"`, `"error"`. The process exit code is 0 for success and 1 when `--fail-level` is breached or a command error occurs.
 
 ## Next steps
 

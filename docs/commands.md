@@ -170,10 +170,10 @@ Consolidated readiness report across multiple repos.
 agentrc batch-readiness --output team.html
 ```
 
-| Flag                 | Default | Description                  |
-| -------------------- | ------- | ---------------------------- |
-| `--output <path>`    |         | Write HTML report            |
-| `--policy <sources>` |         | Comma-separated policy paths |
+| Flag                 | Default | Description                                  |
+| -------------------- | ------- | -------------------------------------------- |
+| `--output <path>`    |         | Write HTML report                            |
+| `--policy <sources>` |         | Comma-separated policy paths or npm packages |
 
 ---
 
@@ -182,8 +182,8 @@ agentrc batch-readiness --output team.html
 Clone a repo, generate configs, and open a PR. See [At Scale](at-scale.md) for the full workflow.
 
 ```bash
-agentrc pr owner/repo-name           # GitHub
-agentrc pr org/project/repo          # Azure DevOps
+agentrc pr owner/repo-name                      # GitHub
+agentrc pr org/project/repo --provider azure    # Azure DevOps
 ```
 
 | Flag              | Default                 | Description          |

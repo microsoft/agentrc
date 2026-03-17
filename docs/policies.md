@@ -90,10 +90,12 @@ Control the overall pass rate:
 JSON policies can only customize existing criteria (disable, override, set thresholds). To **add new criteria** with custom detection logic, use a TypeScript/JavaScript policy module passed via `--policy`:
 
 ```bash
-agentrc readiness --policy ./my-plugin.ts
+agentrc readiness --policy ./my-plugin.js
 ```
 
-See [Plugin System](dev/plugins.md) for the full TypeScript plugin API.
+> `.ts` policy files require a TypeScript-capable runtime (e.g., `npx tsx`) or must be compiled to `.js` first.
+
+See [Plugin System](dev/plugins.md) for the full plugin API.
 
 ## Chaining policies
 
