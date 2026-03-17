@@ -1,283 +1,101 @@
 # AgentRC
 
-> Prime your repositories for AI-assisted development.
+**Context engineering for AI coding agents.**
 
 [![CI](https://github.com/microsoft/agentrc/actions/workflows/ci.yml/badge.svg)](https://github.com/microsoft/agentrc/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 > [!WARNING]
-> **Experimental** — This project is under active development. Expect breaking changes to commands, APIs, and output formats. Ready for early adopter feedback — [open an issue](https://github.com/microsoft/agentrc/issues).
+> **Experimental** — Under active development. Expect breaking changes. [Open an issue](https://github.com/microsoft/agentrc/issues) with feedback.
 
-AI coding agents are only as effective as the context they receive. AgentRC is a CLI and VS Code extension that closes the gap — from a single repo to hundreds across your org.
+---
 
-**Measure** — Analyze repo structure and score readiness across a 5-level maturity model.
-**Generate** — Produce tailored instructions, evals, and dev configs using the Copilot SDK.
-**Maintain** — Run evaluations in CI to catch instruction drift as code evolves.
+AI coding agents work best when they know how to build, test, and lint your code — plus your architecture, conventions, and the external services your team relies on. Most repos ship none of that.
+
+AgentRC reads your codebase and generates the files that close that gap — then evaluates whether they actually help, so the context doesn't go stale as your code evolves.
+
+```bash
+npx github:microsoft/agentrc
+```
+
+Works as a CLI, as a [VS Code extension](docs/extension.md), and in your [CI/CD pipeline](docs/ci-integration.md) to monitor drift. No config needed — runs on any repo with Node.js 20+.
 
 ![AgentRC — Measure, Generate, Maintain cycle](docs/assets/agentrc-overview.png)
 
-## Quick Start
+## What it does
+
+### Measure
+
+Score your repo’s AI-readiness across 9 pillars and a 5-level maturity model. Find out what context is missing — from basic linting to MCP server configs.
 
 ```bash
-# Run directly (no install needed)
 npx github:microsoft/agentrc readiness
 ```
 
-`npx github:<owner>/agentrc ...` installs from the Git repository and runs the package `prepare` script, which builds the CLI before first use.
+### Generate
 
-Or install locally:
-
-```bash
-git clone https://github.com/microsoft/agentrc.git
-cd agentrc && npm install && npm run build && npm link
-
-# 1. Inspect the repo shape
-agentrc analyze
-
-# 2. Check how AI-ready your repo is
-agentrc readiness
-
-# 3. Generate instructions
-agentrc instructions
-
-# 4. Generate MCP and VS Code configs
-agentrc generate mcp
-agentrc generate vscode
-
-# Or do the guided flow interactively
-agentrc init
-```
-
-## Prerequisites
-
-| Requirement                       | Notes                                                            |
-| --------------------------------- | ---------------------------------------------------------------- |
-| **Node.js 20+**                   | Runtime                                                          |
-| **GitHub Copilot CLI**            | Bundled with the VS Code Copilot Chat extension                  |
-| **Copilot authentication**        | Run `copilot` → `/login`                                         |
-| **GitHub CLI** _(optional)_       | For batch processing and PRs: `brew install gh && gh auth login` |
-| **Azure DevOps PAT** _(optional)_ | Set `AZURE_DEVOPS_PAT` for Azure DevOps workflows                |
-
-## Commands
-
-### `agentrc analyze` — Inspect Repository Structure
-
-Detects languages, frameworks, monorepo/workspace structure, and area mappings:
+Produce tailored instruction files, evals, and dev configs via the Copilot SDK. No templates — AgentRC reads your actual code and generates context specific to your stack.
 
 ```bash
-agentrc analyze                                # terminal summary
-agentrc analyze --json                         # machine-readable analysis
-agentrc analyze --output analysis.json         # save JSON report
-agentrc analyze --output analysis.md           # save Markdown report
-agentrc analyze --output analysis.json --force # overwrite existing report
+npx github:microsoft/agentrc instructions
 ```
 
-### `agentrc readiness` — Run Readiness Report
+### Maintain
 
-Score a repo across 9 pillars grouped into **Repo Health** and **AI Setup**:
+Context goes stale as your codebase evolves. Evaluate whether your instructions still improve agent responses, and run the check in CI so drift doesn't slip through.
 
 ```bash
-agentrc readiness                        # terminal summary
-agentrc readiness --visual               # GitHub-themed HTML report
-agentrc readiness --per-area             # include per-area breakdown
-agentrc readiness --output readiness.json # save JSON report
-agentrc readiness --output readiness.md   # save Markdown report
-agentrc readiness --output readiness.html # save HTML report
-agentrc readiness --policy ./examples/policies/strict.json # apply a custom policy
-agentrc readiness --json                 # machine-readable JSON
-agentrc readiness --fail-level 3         # CI gate: exit 1 if below level 3
+npx github:microsoft/agentrc eval
 ```
 
-**Maturity levels:**
+## Works at every scale
 
-| Level | Name         | What it means                                       |
-| ----- | ------------ | --------------------------------------------------- |
-| 1     | Functional   | Builds, tests, basic tooling in place               |
-| 2     | Documented   | README, CONTRIBUTING, custom instructions exist     |
-| 3     | Standardized | CI/CD, security policies, CODEOWNERS, observability |
-| 4     | Optimized    | MCP servers, custom agents, AI skills configured    |
-| 5     | Autonomous   | Full AI-native development with minimal oversight   |
+| Workflow                  | Command                                   |
+| ------------------------- | ----------------------------------------- |
+| Interactive hub           | `agentrc`                                 |
+| One-time setup            | `agentrc init`                            |
+| CI quality gate           | `agentrc readiness --fail-level 3 --json` |
+| Batch across an org       | `agentrc batch`                           |
+| Automated PR for any repo | `agentrc pr owner/repo`                   |
 
-At Level 2, AgentRC also checks **instruction consistency** — when a repo has multiple AI instruction files (e.g. `copilot-instructions.md`, `CLAUDE.md`, `AGENTS.md`), it detects whether they diverge. Symlinked or identical files pass; diverging files fail with a similarity score and a suggestion to consolidate.
+Works with **GitHub** and **Azure DevOps**. Supports monorepos, multi-root VS Code workspaces, and custom [policies](docs/policies.md).
 
-### `agentrc instructions` — Generate Instructions
+## What gets generated
 
-Generate instructions using the Copilot SDK:
+| File                              | Purpose                                    |
+| --------------------------------- | ------------------------------------------ |
+| `.github/copilot-instructions.md` | Teaches AI agents your repo's conventions  |
+| `.vscode/mcp.json`                | Connects AI to your stack's tools and data |
+| `.vscode/settings.json`           | Tunes VS Code for AI-assisted development  |
+| `agentrc.eval.json`               | Test cases to measure instruction quality  |
 
-```bash
-agentrc instructions                      # copilot-instructions.md (default)
-agentrc instructions --output AGENTS.md   # custom output path
-agentrc instructions --strategy nested    # nested hub + detail files in .agents/
-agentrc instructions --areas              # root + all detected areas
-agentrc instructions --area frontend      # single area
-agentrc instructions --areas-only         # areas only (skip root)
-agentrc instructions --dry-run             # preview without writing
-agentrc instructions --model claude-sonnet-4.6
-```
+> For multi-agent support (Copilot + Claude + others), generate `AGENTS.md` with `--output AGENTS.md`. See [Custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions).
 
-**Concepts:**
+## Documentation
 
-- **Format**: Output file — `copilot-instructions.md` (default) or `AGENTS.md` (via `--output`)
-- **Strategy**: `flat` (single file, default) or `nested` (hub + per-topic detail files)
-- **Scope**: `root only` (default), `--areas` (root + areas), `--area <name>` (single area)
+|                                                |                                                         |
+| ---------------------------------------------- | ------------------------------------------------------- |
+| **[Getting Started](docs/getting-started.md)** | Prerequisites and first run                             |
+| **[Concepts](docs/concepts.md)**               | Maturity model, readiness pillars, how generation works |
+| **[Commands](docs/commands.md)**               | Full CLI reference                                      |
+| **[Configuration](docs/configuration.md)**     | Areas, workspaces, monorepos                            |
+| **[Policies](docs/policies.md)**               | Custom readiness scoring                                |
+| **[At Scale](docs/at-scale.md)**               | Batch processing across orgs                            |
+| **[CI Integration](docs/ci-integration.md)**   | GitHub Actions & Azure Pipelines                        |
+| **[VS Code Extension](docs/extension.md)**     | Sidebar views, commands, settings                       |
+| **[Examples](examples/)**                      | Configs, evals, and policies                            |
 
-### `agentrc eval` — Evaluate Instructions
-
-Measure how instructions improve AI responses with a judge model:
-
-```bash
-agentrc eval --init                       # scaffold eval config from codebase
-agentrc eval agentrc.eval.json             # run evaluation
-agentrc eval --model gpt-4.1 --judge-model claude-sonnet-4.6
-agentrc eval --fail-level 80              # CI gate: exit 1 if pass rate < 80%
-```
-
-### `agentrc generate` — Generate Configs
-
-> **Note:** `generate instructions` and `generate agents` are deprecated — use `agentrc instructions` directly.
-
-```bash
-agentrc generate mcp                      # .vscode/mcp.json
-agentrc generate vscode --force           # .vscode/settings.json (overwrite)
-```
-
-### `agentrc batch` / `agentrc pr` — Batch & PRs
-
-```bash
-agentrc batch                             # interactive TUI (GitHub)
-agentrc batch --provider azure            # Azure DevOps
-agentrc batch owner/repo1 owner/repo2 --json
-agentrc batch-readiness --output team.html
-agentrc pr owner/repo-name                # clone → generate → open PR
-```
-
-### `agentrc tui` — Interactive Mode
-
-```bash
-agentrc tui
-```
-
-### `agentrc init` — Init Repository
-
-Interactive or headless repo onboarding — analyzes your stack and generates instructions. For monorepos, auto-detects workspaces and bootstraps `agentrc.config.json` with workspace and area definitions.
-
-### Global Options
-
-All commands support `--json` (structured JSON to stdout) and `--quiet` (suppress stderr). JSON output uses a `CommandResult<T>` envelope:
-
-```json
-{ "ok": true, "status": "success", "data": { ... } }
-```
-
-### Readiness Policies
-
-Policies customize scoring criteria, override metadata, and tune thresholds:
-
-```bash
-agentrc readiness --policy ./examples/policies/strict.json
-agentrc readiness --policy ./examples/policies/strict.json,./my-overrides.json  # chain multiple
-```
-
-```json
-{
-  "name": "my-org-policy",
-  "criteria": {
-    "disable": ["lint-config"],
-    "override": { "readme": { "impact": "high", "level": 2 } }
-  },
-  "extras": { "disable": ["pre-commit"] },
-  "thresholds": { "passRate": 0.9 }
-}
-```
-
-Policies can also be set in `agentrc.config.json` (`{ "policies": ["./my-policy.json"] }`).
-
-### Configuration File
-
-`agentrc.config.json` (repo root or `.github/`) configures areas, workspaces, and policies:
-
-```json
-{
-  "areas": [{ "name": "docs", "applyTo": "docs/**" }],
-  "workspaces": [
-    {
-      "name": "frontend",
-      "path": "packages/frontend",
-      "areas": [
-        { "name": "app", "applyTo": "app/**" },
-        { "name": "shared", "applyTo": ["shared/**", "common/**"] }
-      ]
-    }
-  ],
-  "policies": ["./policies/strict.json"]
-}
-```
-
-- **`areas`** — standalone areas with glob patterns (relative to repo root)
-- **`workspaces`** — monorepo sub-projects; each workspace groups areas scoped to a subdirectory. Area `applyTo` patterns are relative to the workspace path. Workspace areas get namespaced names (`frontend/app`) and a `workingDirectory` for scoped eval sessions.
-- `agentrc init` auto-detects workspaces (via `.vscode` folders and sibling-area grouping) and bootstraps this file.
-
-> **Security:** Config-sourced policies are restricted to JSON files only — JS/TS module policies must be passed via `--policy`.
-
-See [docs/plugins.md](docs/plugins.md) for the full plugin authoring guide, including imperative TypeScript plugins, lifecycle hooks, and the trust model.
-
-## Development
-
-```bash
-npm run typecheck        # type check
-npm run lint             # ESLint (flat config + Prettier)
-npm run test             # Vitest tests
-npm run test:coverage    # with coverage
-npm run build            # production build via tsup
-npx tsx src/index.ts --help  # run from source
-```
-
-### VS Code Extension
-
-```bash
-cd vscode-extension
-npm install && npm run build
-# Press F5 to launch Extension Development Host
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for workflow and code style guidelines.
-
-## Project Structure
-
-```
-packages/core/
-└── src/
-  ├── index.ts          # Shared public API surface
-  ├── services/         # Core product logic reused by CLI and extension
-  │   ├── readiness.ts   # 9-pillar scoring engine with pillar groups
-  │   ├── visualReport.ts # HTML report generator
-  │   ├── instructions.ts # Copilot SDK integration
-  │   ├── analyzer.ts    # Repo scanning (languages, frameworks, monorepos)
-  │   ├── evaluator.ts   # Eval runner + trajectory viewer
-  │   ├── generator.ts   # MCP/VS Code config generation
-  │   ├── policy.ts      # Readiness policy loading and chain resolution
-  │   ├── policy/        # Plugin engine (types, compiler, loader, adapter, shadow)
-  │   ├── git.ts         # Git operations (clone, branch, push)
-  │   ├── github.ts      # GitHub API (Octokit)
-  │   └── azureDevops.ts # Azure DevOps API
-  └── utils/            # Shared utilities (fs, logger, output)
-
-src/
-├── cli.ts                # Commander CLI wiring
-├── commands/             # CLI subcommands (thin orchestrators)
-├── index.ts              # CLI entrypoint
-└── ui/                   # Ink/React terminal UI
-
-vscode-extension/         # VS Code extension shell over packages/core
-```
+[Customize AI in VS Code](https://code.visualstudio.com/docs/copilot/customization/overview) · [Custom instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) · [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Troubleshooting
 
-**"Copilot CLI not found"** — Install the GitHub Copilot Chat extension in VS Code. The CLI is bundled with it.
+**"Copilot CLI not found"** — Install the [GitHub Copilot Chat extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat) in VS Code. The CLI is bundled with it.
 
-**"Copilot CLI not logged in"** — Run `copilot` in your terminal, then `/login` to authenticate.
+**"Copilot CLI not logged in"** — Run `copilot` in your terminal, then `/login`.
 
-**"GitHub authentication required"** — Install GitHub CLI (`brew install gh && gh auth login`) or set `GITHUB_TOKEN` / `GH_TOKEN`.
+**"GitHub auth required"** — `brew install gh && gh auth login`, or set `GITHUB_TOKEN` (or `GH_TOKEN`).
+
+**"Azure DevOps auth required"** — Set `AZURE_DEVOPS_PAT` or `AZDO_PAT`.
 
 ## License
 
