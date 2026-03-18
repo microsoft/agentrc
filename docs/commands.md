@@ -207,6 +207,56 @@ agentrc tui
 | `--repo <path>`  | cwd     | Repository path      |
 | `--no-animation` |         | Skip animated banner |
 
+### Keyboard shortcuts
+
+Once inside the TUI, use keyboard shortcuts to navigate:
+
+**Main menu**
+
+| Key | Action                            |
+| --- | --------------------------------- |
+| `G` | Generate instructions / configs   |
+| `R` | Run readiness report              |
+| `E` | Eval menu                         |
+| `B` | Batch menu                        |
+| `M` | Change eval model                 |
+| `J` | Change judge model                |
+| `Q` | Quit                              |
+
+**Generate submenu**
+
+| Key   | Action                                       |
+| ----- | -------------------------------------------- |
+| `C`   | Generate `copilot-instructions.md`           |
+| `A`   | Generate `AGENTS.md`                         |
+| `N`   | Generate nested area instructions (monorepo) |
+| `Esc` | Back                                         |
+
+**Eval submenu**
+
+| Key     | Action              |
+| ------- | ------------------- |
+| `R`     | Run eval            |
+| `I`     | Init eval config    |
+| `B/Esc` | Back                |
+
+**Batch submenu**
+
+| Key     | Action       |
+| ------- | ------------ |
+| `G`     | GitHub batch |
+| `A`     | Azure DevOps |
+| `B/Esc` | Back         |
+
+**Preview / confirm**
+
+| Key | Action   |
+| --- | -------- |
+| `S` | Save     |
+| `D` | Discard  |
+| `Y` | Overwrite (when file exists) |
+| `Q` | Quit     |
+
 ## Next steps
 
 - [Concepts](concepts.md) — understand maturity model and readiness pillars
