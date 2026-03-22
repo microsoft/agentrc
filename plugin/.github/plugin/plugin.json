@@ -1,0 +1,9 @@
+{
+  "name": "agentrc",
+  "version": "2.1.0",
+  "description": "Skills for AI-assisted repository priming — generate copilot-instructions.md, area instructions, and nested AGENTS.md files.",
+  "author": "Microsoft",
+  "repository": "https://github.com/microsoft/agentrc",
+  "license": "MIT",
+  "keywords": ["agentrc", "instructions", "copilot", "repository-priming"]
+}

@@ -90,6 +90,9 @@ export {
   stripMarkdownFences
 } from "./services/instructions";
 
+export { setBuiltinSkillsDir, getSkillDirectory } from "./services/skills";
+export type { BuiltinSkillName } from "./services/skills";
+
 export { parsePolicySources, loadPolicy, resolveChain } from "./services/policy";
 
 export {

@@ -83,6 +83,7 @@ Works with **GitHub** and **Azure DevOps**. Supports monorepos, multi-root VS Co
 | **[At Scale](docs/at-scale.md)**               | Batch processing across orgs                            |
 | **[CI Integration](docs/ci-integration.md)**   | GitHub Actions & Azure Pipelines                        |
 | **[VS Code Extension](docs/extension.md)**     | Sidebar views, commands, settings                       |
+| **[Agent Plugin](plugin/README.md)**           | Install as a Copilot agent plugin with built-in skills  |
 | **[Examples](examples/)**                      | Configs, evals, and policies                            |
 
 [Customize AI in VS Code](https://code.visualstudio.com/docs/copilot/customization/overview) · [Custom instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) · [CONTRIBUTING.md](CONTRIBUTING.md)

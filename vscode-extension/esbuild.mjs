@@ -1,5 +1,6 @@
 import * as esbuild from "esbuild";
 import { readFile } from "node:fs/promises";
+import { cpSync } from "node:fs";
 
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
@@ -56,7 +57,19 @@ const buildOptions = {
   }
 };
 
+/** esbuild plugin: copy built-in skill assets after each build. */
+const copySkillAssets = {
+  name: "copy-skill-assets",
+  setup(build) {
+    build.onEnd(() => {
+      cpSync("../plugin/skills", "out/skills", { recursive: true });
+    });
+  }
+};
+
 async function main() {
+  buildOptions.plugins.push(copySkillAssets);
+
   if (watch) {
     const ctx = await esbuild.context(buildOptions);
     await ctx.watch();

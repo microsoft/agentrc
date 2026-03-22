@@ -41,6 +41,8 @@ VS Code extension: `node esbuild.mjs` from `vscode-extension/`; typecheck with `
 - **Entrypoint:** `src/index.ts` → `runCli()` in `src/cli.ts`
 - **Commands** (`src/commands/`) are thin orchestrators — parse options, call services, format output.
 - **Services** (`src/services/`) contain all business logic. Commands never access APIs or filesystem directly.
+- **Core** (`packages/core/`) — shared service library; re-exported by CLI and extension via `@agentrc/core` path alias.
+- **Plugin** (`plugin/`) — built-in agent plugin with SKILL.md files for instruction generation. Copied to `dist/skills/` (CLI) and `out/skills/` (extension) at build time. Marketplace manifest at `.github/plugin/marketplace.json`.
 - **UI** (`src/ui/`) — Ink/React 19 components for interactive TUI. Use Ink 6 APIs.
 - **Utils** (`src/utils/`) — `output.ts`, `fs.ts`, `logger.ts`, `repo.ts`, `pr.ts`.
 - **VS Code Extension** (`vscode-extension/`) — companion extension; imports CLI services via path alias `agentrc/*`. See extension-specific instructions for details.

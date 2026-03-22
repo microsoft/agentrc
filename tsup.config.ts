@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import { defineConfig } from "tsup";
 import type { Plugin } from "esbuild";
+import { cpSync } from "node:fs";
 
 /**
  * Shim the SDK's getBundledCliPath() which calls import.meta.resolve().
@@ -68,5 +69,9 @@ export default defineConfig({
     options.alias = {
       "@agentrc/core": "./packages/core/src"
     };
+  },
+  async onSuccess() {
+    // Copy built-in skill assets alongside the bundled JS
+    cpSync("plugin/skills", "dist/skills", { recursive: true });
   }
 });

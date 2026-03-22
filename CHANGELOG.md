@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
+- **Agent plugin & marketplace** — expose built-in instruction-generation skills as a VS Code agent plugin (`plugin/`) with marketplace manifest (`.github/plugin/marketplace.json`). Skills can be installed from source or discovered through the marketplace.
+- **SKILL.md-based prompts** — replace hardcoded inline prompts with SKILL.md assets loaded via the Copilot SDK `skillDirectories` option and invoked with `/skill-name` prefixes.
 - **Enhanced .NET detection** — F# support, framework parsing, and expanded signals (#60)
 - **De-branded terminology** — `--dry-run` flag, batch instructions command (#55)
 

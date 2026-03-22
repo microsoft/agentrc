@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import * as path from "path";
+import { setBuiltinSkillsDir } from "@agentrc/core";
 import { analyzeCommand, getCachedAnalysis } from "./commands/analyze.js";
 import { generateCommand } from "./commands/generate.js";
 import { instructionsCommand } from "./commands/instructions.js";
@@ -10,6 +12,8 @@ import { batchInstructionsCommand } from "./commands/batch.js";
 import { analysisTreeProvider, readinessTreeProvider } from "./views/providers.js";
 
 export function activate(context: vscode.ExtensionContext): void {
+  // Point the built-in skills resolver to the packaged assets
+  setBuiltinSkillsDir(path.join(context.extensionPath, "out", "skills"));
   // Status bar — only show after analysis
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
   statusBar.text = "$(beaker) AgentRC";
