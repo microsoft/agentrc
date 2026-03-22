@@ -133,11 +133,12 @@ agentrc generate <type> [path]
 
 Types: `mcp`, `vscode` (also `instructions` and `agents`, but deprecated — use `agentrc instructions`).
 
-| Flag                | Default             | Description              |
-| ------------------- | ------------------- | ------------------------ |
-| `--force`           |                     | Overwrite existing files |
-| `--model <name>`    | `claude-sonnet-4.6` | Model for generation     |
-| `--strategy <mode>` | `flat`              | Instruction strategy     |
+| Flag                | Default             | Description                             |
+| ------------------- | ------------------- | --------------------------------------- |
+| `--force`           |                     | Overwrite existing files                |
+| `--model <name>`    | `claude-sonnet-4.6` | Model for generation                    |
+| `--strategy <mode>` | `flat`              | Instruction strategy                    |
+| `--dry-run`         |                     | Preview generated files without writing |
 
 ---
 

@@ -121,7 +121,7 @@ How do you know your instructions actually help? AgentRC includes an evaluation 
 
 ### How it works
 
-1. **Scaffold test cases** from your codebase — AgentRC generates scenarios that test whether the AI follows your repo's conventions:
+1. **Scaffold test cases** from your codebase — AgentRC generates implementation planning tasks that test whether the AI follows your repo's conventions:
 
    ```bash
    agentrc eval --init
@@ -134,6 +134,28 @@ How do you know your instructions actually help? AgentRC includes an evaluation 
    ```
 
 3. **Score with a judge model** — A separate AI model evaluates whether the instructed response is better, producing a pass/fail verdict per test case.
+
+### Eval config format
+
+Each test case has a `prompt` (what the agent receives) and an `expectation` (what the judge checks for). Expectations can be a single string or an array of strings for structured criteria:
+
+```json
+{
+  "cases": [
+    {
+      "id": "add-feature",
+      "prompt": "Add a new CLI command that lists all detected areas",
+      "expectation": [
+        "Identify which files to create/modify and how the command wires into the CLI.",
+        "Implementation steps: create command file, call analyzer, format output.",
+        "Verification: typecheck passes, unit tests, manual test against a monorepo."
+      ]
+    }
+  ]
+}
+```
+
+All AgentRC JSON files support `//` and `/* */` comments (JSONC).
 
 ### Using evaluation as a CI gate
 

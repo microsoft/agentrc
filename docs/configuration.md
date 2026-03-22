@@ -2,7 +2,9 @@
 
 > [AgentRC](https://github.com/microsoft/agentrc) — prime your repositories for AI-assisted development.
 
-AgentRC uses `agentrc.config.json` to define areas, workspaces, and policies for your repo. This file is optional for single-project repos — `agentrc init` creates it automatically when it detects a monorepo.
+AgentRC uses `agentrc.config.json` to define areas, workspaces, and policies for your repo. Running `agentrc init` always creates this file — for simple repos it starts as an empty `{}` stub that you can populate with policies, strategy, or other settings; for monorepos it auto-detects workspaces and areas.
+
+> **JSONC supported** — all AgentRC JSON files (`agentrc.config.json`, `agentrc.eval.json`, policy files) accept `//` and `/* */` comments.
 
 ## File location
 

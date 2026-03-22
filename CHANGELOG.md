@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Features
+
+- **`--dry-run` for generate** — preview which files would be created or skipped without writing anything (`agentrc generate mcp --dry-run`)
+- **JSONC support** — `agentrc.config.json`, `agentrc.eval.json`, and policy files now accept `//` and `/* */` comments
+- **Array eval expectations** — `expectation` field in eval configs accepts `string[]` for structured criteria
+
+### Bug Fixes
+
+- **Config scaffolding for simple repos** — `agentrc init` and the TUI now create `agentrc.config.json` even when no areas are detected, producing a minimal `{}` stub. Previously failed with "No areas detected. Cannot scaffold agentrc.config.json."
+
 ## [2.1.0]
 
 ### Features

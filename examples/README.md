@@ -47,6 +47,6 @@ Use `agentrc instructions` when you want the dedicated instruction-generation wo
 
 `agentrc.config.json` is a good starting point for repositories that need area-level instruction generation or per-workspace readiness tracking.
 
-`agentrc.eval.json` is a starter eval config for comparing how well repository instructions help the model answer project-specific questions.
+`agentrc.eval.json` is a starter eval config with implementation planning tasks. Expectations can be a single string or an array of strings for structured criteria. All AgentRC JSON files support `//` and `/* */` comments (JSONC).
 
 See `policies/README.md` for details on the included readiness policies and how to compose them.
