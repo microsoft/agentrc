@@ -22,12 +22,15 @@ describe("scaffoldAgentrcConfig", () => {
     tmpDirs.length = 0;
   });
 
-  it("returns null when areas array is empty", async () => {
+  it("writes minimal config when areas array is empty", async () => {
     const repoPath = await makeTmpDir();
     const result = await scaffoldAgentrcConfig(repoPath, []);
-    expect(result).toBeNull();
-    const configPath = path.join(repoPath, "agentrc.config.json");
-    await expect(fs.access(configPath)).rejects.toThrow();
+    expect(result).not.toBeNull();
+    expect(result.wrote).toBe(true);
+    expect(result.configPath).toBe(path.join(repoPath, "agentrc.config.json"));
+
+    const raw = JSON.parse(await fs.readFile(result.configPath, "utf8"));
+    expect(raw).toEqual({});
   });
 
   it("writes agentrc.config.json with standalone areas", async () => {
@@ -37,11 +40,10 @@ describe("scaffoldAgentrcConfig", () => {
       { name: "src", applyTo: "src/**", source: "auto" }
     ];
     const result = await scaffoldAgentrcConfig(repoPath, areas);
-    expect(result).not.toBeNull();
-    expect(result!.wrote).toBe(true);
-    expect(result!.configPath).toBe(path.join(repoPath, "agentrc.config.json"));
+    expect(result.wrote).toBe(true);
+    expect(result.configPath).toBe(path.join(repoPath, "agentrc.config.json"));
 
-    const raw = JSON.parse(await fs.readFile(result!.configPath, "utf8"));
+    const raw = JSON.parse(await fs.readFile(result.configPath, "utf8"));
     expect(raw.areas).toHaveLength(2);
     expect(raw.areas[0].name).toBe("docs");
     expect(raw.areas[1].name).toBe("src");
@@ -73,10 +75,9 @@ describe("scaffoldAgentrcConfig", () => {
       { name: "docs", applyTo: "docs/**", source: "auto" }
     ];
     const result = await scaffoldAgentrcConfig(repoPath, areas);
-    expect(result).not.toBeNull();
-    expect(result!.wrote).toBe(true);
+    expect(result.wrote).toBe(true);
 
-    const raw = JSON.parse(await fs.readFile(result!.configPath, "utf8"));
+    const raw = JSON.parse(await fs.readFile(result.configPath, "utf8"));
     // Only "docs" is a standalone area — app and lib grouped into workspace
     expect(raw.areas).toHaveLength(1);
     expect(raw.areas[0].name).toBe("docs");
@@ -90,11 +91,11 @@ describe("scaffoldAgentrcConfig", () => {
 
     // Write once
     const first = await scaffoldAgentrcConfig(repoPath, areas, false);
-    expect(first!.wrote).toBe(true);
+    expect(first.wrote).toBe(true);
 
     // Write again without force — should skip
     const second = await scaffoldAgentrcConfig(repoPath, areas, false);
-    expect(second!.wrote).toBe(false);
+    expect(second.wrote).toBe(false);
   });
 
   it("overwrites when force is true", async () => {
@@ -109,7 +110,7 @@ describe("scaffoldAgentrcConfig", () => {
 
     // Force overwrite
     const result = await scaffoldAgentrcConfig(repoPath, areas, true);
-    expect(result!.wrote).toBe(true);
+    expect(result.wrote).toBe(true);
 
     const raw = JSON.parse(await fs.readFile(configPath, "utf8"));
     expect(raw.custom).toBeUndefined();
@@ -122,7 +123,7 @@ describe("scaffoldAgentrcConfig", () => {
       { name: "api", applyTo: "src/api/**", description: "Backend API layer", source: "auto" }
     ];
     const result = await scaffoldAgentrcConfig(repoPath, areas);
-    const raw = JSON.parse(await fs.readFile(result!.configPath, "utf8"));
+    const raw = JSON.parse(await fs.readFile(result.configPath, "utf8"));
     expect(raw.areas[0].description).toBe("Backend API layer");
   });
 });

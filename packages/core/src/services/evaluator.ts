@@ -1,14 +1,14 @@
 import fs from "fs/promises";
 import path from "path";
 
-import { buildTimestampedName, safeWriteFile } from "../utils/fs";
+import { buildTimestampedName, safeWriteFile, stripJsonComments } from "../utils/fs";
 
 import { assertCopilotCliReady } from "./copilot";
 import { createCopilotClient } from "./copilotSdk";
 import type { EvalConfig } from "./evalScaffold";
 
 const DEFAULT_SYSTEM_MESSAGE =
-  "You are answering questions about this repository. Use tools to inspect the repo and cite its files. Avoid generic Copilot CLI details unless the prompt explicitly asks for them.";
+  "Research using read-only tools and make a plan for the given task, including concrete implementation steps and verification steps.";
 
 interface CopilotSession {
   on(handler: (event: { type: string; data?: Record<string, unknown> }) => void): void;
@@ -67,7 +67,7 @@ type TrajectoryEvent = {
 export type EvalResult = {
   id: string;
   prompt: string;
-  expectation: string;
+  expectation: string | string[];
   withInstructions?: string;
   withoutInstructions?: string;
   verdict?: "pass" | "fail" | "unknown";
@@ -258,7 +258,7 @@ async function askOnce(client: CopilotClient, options: AskOptions): Promise<AskR
 type JudgeOptions = {
   model: string;
   prompt: string;
-  expectation: string;
+  expectation: string | string[];
   withoutInstructions: string;
   withInstructions: string;
 };
@@ -294,10 +294,14 @@ async function judge(
     }
   });
 
+  const expectationText = Array.isArray(options.expectation)
+    ? options.expectation.join("\n")
+    : options.expectation;
+
   const prompt = [
     "Evaluate which response best matches the expectation.",
     "",
-    `Expectation: ${options.expectation}`,
+    `Expectation: ${expectationText}`,
     "",
     "Response A (without custom instructions):",
     options.withoutInstructions,
@@ -345,7 +349,7 @@ function parseJudge(content: string): JudgeResult {
 
 async function loadConfig(configPath: string): Promise<EvalConfig> {
   const raw = await fs.readFile(configPath, "utf8");
-  const parsed = JSON.parse(raw) as EvalConfig;
+  const parsed = JSON.parse(stripJsonComments(raw)) as EvalConfig;
   if (!parsed || !Array.isArray(parsed.cases)) {
     throw new Error("Eval config must have a 'cases' array.");
   }

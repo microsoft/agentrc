@@ -868,20 +868,12 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
                 setMessage("agentrc.config.json already exists.");
                 return;
               }
-              if (repoAreas.length === 0) {
-                setMessage("No areas detected. Cannot scaffold agentrc.config.json.");
-                return;
-              }
               setStatus("generating");
               setMessage("Creating agentrc.config.json...");
               addLog("Scaffolding agentrc.config.json...", "progress");
               try {
                 const result = await scaffoldAgentrcConfig(repoPath, repoAreas);
-                if (!result) {
-                  setStatus("idle");
-                  setMessage("Nothing to scaffold — no areas or workspaces detected.");
-                  addLog("No areas to scaffold into config.", "info");
-                } else if (result.wrote) {
+                if (result.wrote) {
                   setHasAgentrcConfig(true);
                   setStatus("done");
                   const msg = `Created agentrc.config.json`;

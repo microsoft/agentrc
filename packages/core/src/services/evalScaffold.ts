@@ -10,7 +10,7 @@ const EVAL_SCAFFOLD_RECOVERY_TIMEOUT_MS = 90000;
 export type EvalCase = {
   id?: string;
   prompt: string;
-  expectation: string;
+  expectation: string | string[];
   area?: string;
   workingDirectory?: string;
 };
@@ -53,7 +53,7 @@ export async function generateEvalScaffold(options: EvalScaffoldOptions): Promis
       workingDirectory: repoPath,
       systemMessage: {
         content:
-          "You are an expert codebase analyst specializing in deep architectural analysis. Generate challenging, cross-cutting eval cases for this repository that require synthesizing information from multiple files and tracing logic across layers. Avoid trivial questions answerable from a single file read or grep. Use tools (glob, view, grep) extensively to inspect the codebase. Output ONLY JSON with keys: instructionFile, cases (array of {id,prompt,expectation})."
+          "Generate challenging implementation planning tasks for this repository. Each task should require cross-cutting changes across multiple files. Tasks can range from specific feature additions to broader refactoring plans. Avoid trivial tasks or pure Q&A questions. Output ONLY JSON with keys: instructionFile, cases (array of {id,prompt,expectation})."
       },
       infiniteSessions: { enabled: false }
     });
@@ -100,32 +100,39 @@ export async function generateEvalScaffold(options: EvalScaffoldOptions): Promis
       : "";
 
     const prompt = [
-      `Analyze this repository and generate ${count} eval cases.`,
+      `Analyze this repository and generate ${count} implementation planning tasks.`,
       "",
-      "IMPORTANT: Generate HARD eval cases that require deep, cross-cutting understanding of the codebase.",
-      "Each case should require synthesizing information from MULTIPLE files or tracing logic across several layers.",
-      "Do NOT generate simple questions that can be answered by reading a single file or running a single grep.",
+      "Each task should represent a REAL developer request — the kind of thing someone would actually type into a coding agent.",
+      "Tasks should require understanding MULTIPLE files and cross-cutting concerns.",
       "",
-      "Good eval case examples (adapt to this repo):",
-      "- Questions about how data flows end-to-end through multiple modules (e.g., 'Trace what happens when X is called — which services, transforms, and side effects are involved?')",
-      "- Questions about implicit conventions or patterns that span many files (e.g., 'What error-handling pattern is used across the service layer, and where does it deviate?')",
-      "- Questions requiring understanding of runtime behavior not obvious from static code (e.g., 'What is the order of initialization and what would break if module X loaded before Y?')",
-      "- Questions about non-obvious interactions between components (e.g., 'How does changing config option X affect the behavior of feature Y?')",
-      "- Questions about edge cases or failure modes that require reading implementation details across files",
-      "- Questions that require understanding the type system, generics, or shared interfaces across module boundaries",
+      "PROMPT RULES (the prompt field is what the eval agent receives):",
+      "- Write prompts as a developer would naturally phrase them — short, direct requests.",
+      "- Do NOT describe expected output format or what the response should include.",
+      "- Do NOT add meta-instructions like 'The output should show...' or 'Include in your plan...' or 'Your plan should cover...'",
+      "- Do NOT embed implementation details in the prompt (pillar names, levels, specific output formats) — those belong in the expectation.",
+      "- Good: 'Add a --dry-run flag to the generate command'",
+      "- Good: 'Add a readiness criterion for CI/CD detection'",
+      "- Bad: 'Add a --dry-run flag that previews what files would be created or modified. The output should show file paths and indicate whether each would be created, updated, or skipped.'",
+      "- Bad: 'Add a readiness criterion that checks for CI/CD and classifies it under a new deployment pillar at level 3'",
       "",
-      "Bad eval case examples (avoid these):",
-      "- 'What does this project do?' (answered by README alone)",
-      "- 'How do I build/test?' (answered by package.json alone)",
-      "- 'What is the entrypoint?' (answered by a single file)",
-      "- Any question answerable by reading one file or searching for one keyword",
+      "EXPECTATION RULES (the expectation field is checked by an LLM judge — be extremely specific):",
+      "- MUST cite exact file paths (e.g., 'packages/core/src/services/generator.ts')",
+      "- MUST cite exact function and type names (e.g., 'generateCopilotInstructions()', 'CommandResult<T>')",
+      "- MUST cite specific CLI commands for verification (e.g., 'npm run typecheck', 'npm test')",
+      "- MUST name the specific test file to update (e.g., 'src/services/__tests__/generator.test.ts')",
+      "- Generic expectations like 'identify the generator service' are USELESS — name the actual function and file.",
       "",
-      "Use tools extensively to inspect the codebase — read multiple files, trace imports, follow call chains.",
-      "If this is a monorepo (npm/pnpm/yarn workspaces, Cargo workspace, Go workspace, .NET solution, Gradle/Maven multi-module), generate cases that involve cross-app dependencies, shared libraries, and how changes in one app affect others.",
-      "Ensure cases cover cross-cutting concerns: data flow, error propagation, configuration impact, implicit coupling, architectural invariants.",
-      "Include a systemMessage that keeps answers scoped to this repository (avoid generic Copilot CLI details unless asked).",
+      "Bad task examples (avoid these):",
+      "- 'What does this project do?' (pure Q&A, not a planning task)",
+      "- 'Explain the architecture' (no implementation expected)",
+      "- Tasks with prescriptive output instructions baked into the prompt",
+      "",
+      "Do NOT generate a systemMessage — the default is used automatically.",
+      "If this is a monorepo, generate tasks that involve cross-app dependencies and shared libraries.",
       "Return JSON ONLY (no markdown, no commentary) in this schema:",
-      '{\n  "instructionFile": ".github/copilot-instructions.md",\n  "systemMessage": "...",\n  "cases": [\n    {"id": "case-1", "prompt": "...", "expectation": "...", "area": "optional-area-name"}\n  ]\n}',
+      options.areas?.length
+        ? '{\n  "instructionFile": ".github/copilot-instructions.md",\n  "cases": [\n    {"id": "case-1", "prompt": "...", "expectation": "...", "area": "optional-area-name"}\n  ]\n}'
+        : '{\n  "instructionFile": ".github/copilot-instructions.md",\n  "cases": [\n    {"id": "case-1", "prompt": "...", "expectation": "..."}\n  ]\n}',
       areaContext
     ].join("\n");
 
@@ -177,7 +184,8 @@ export async function generateEvalScaffold(options: EvalScaffoldOptions): Promis
       throw error;
     }
 
-    const normalized = normalizeEvalConfig(parsed, count);
+    const hasAreas = Boolean(options.areas?.length);
+    const normalized = normalizeEvalConfig(parsed, count, hasAreas);
     return normalized;
   } finally {
     await client.stop();
@@ -205,14 +213,16 @@ function parseEvalConfig(raw: string): EvalConfig {
   return parsed;
 }
 
-function normalizeEvalConfig(parsed: EvalConfig, count: number): EvalConfig {
+function normalizeEvalConfig(parsed: EvalConfig, count: number, hasAreas = true): EvalConfig {
   const cases = (parsed.cases ?? []).slice(0, count).map((entry, index) => {
     const id = typeof entry.id === "string" && entry.id.trim() ? entry.id : `case-${index + 1}`;
     return {
       id,
       prompt: String(entry.prompt ?? "").trim(),
-      expectation: String(entry.expectation ?? "").trim(),
-      area: typeof entry.area === "string" && entry.area.trim() ? entry.area.trim() : undefined,
+      expectation: normalizeExpectation(entry.expectation),
+      ...(hasAreas && typeof entry.area === "string" && entry.area.trim()
+        ? { area: entry.area.trim() }
+        : {}),
       workingDirectory:
         typeof entry.workingDirectory === "string" && entry.workingDirectory.trim()
           ? entry.workingDirectory.trim()
@@ -224,12 +234,19 @@ function normalizeEvalConfig(parsed: EvalConfig, count: number): EvalConfig {
     throw new Error("Eval scaffold JSON did not include any usable cases.");
   }
 
-  const defaultSystemMessage =
-    "You are answering questions about this repository. Use tools to inspect the repo and cite its files. Avoid generic Copilot CLI details unless the prompt explicitly asks for them.";
-
   return {
     instructionFile: parsed.instructionFile ?? ".github/copilot-instructions.md",
-    systemMessage: parsed.systemMessage ?? defaultSystemMessage,
+    ...(parsed.systemMessage ? { systemMessage: parsed.systemMessage } : {}),
     cases
   };
+}
+
+function normalizeExpectation(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) {
+    return value
+      .map((s) => String(s).trim())
+      .filter(Boolean)
+      .join("\n");
+  }
+  return String(value ?? "").trim();
 }

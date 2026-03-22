@@ -1,12 +1,13 @@
 import path from "path";
 
-import { ensureDir, safeWriteFile } from "../utils/fs";
+import { ensureDir, fileExists, safeWriteFile } from "../utils/fs";
 
 import type { RepoAnalysis } from "./analyzer";
 
 export type FileAction = {
   path: string;
   action: "wrote" | "skipped" | "symlink" | "empty";
+  bytes?: number;
 };
 
 export type GenerateResult = {
@@ -18,32 +19,49 @@ export type GenerateOptions = {
   analysis: RepoAnalysis;
   selections: string[];
   force: boolean;
+  dryRun?: boolean;
 };
 
+async function writeOrPreview(
+  filePath: string,
+  content: string,
+  opts: { dryRun?: boolean; force: boolean }
+): Promise<FileAction> {
+  const relPath = path.relative(process.cwd(), filePath);
+  if (opts.dryRun) {
+    const exists = await fileExists(filePath);
+    return {
+      path: relPath,
+      action: !exists || opts.force ? "wrote" : "skipped",
+      bytes: Buffer.byteLength(content, "utf8")
+    };
+  }
+  await ensureDir(path.dirname(filePath));
+  const { wrote } = await safeWriteFile(filePath, content, opts.force);
+  return { path: relPath, action: wrote ? "wrote" : "skipped" };
+}
+
 export async function generateConfigs(options: GenerateOptions): Promise<GenerateResult> {
-  const { repoPath, analysis, selections, force } = options;
+  const { repoPath, analysis, selections, force, dryRun } = options;
   const files: FileAction[] = [];
 
   if (selections.includes("mcp")) {
-    const filePath = path.join(repoPath, ".vscode", "mcp.json");
-    await ensureDir(path.dirname(filePath));
-    const content = renderMcp();
-    const { wrote } = await safeWriteFile(filePath, content, force);
-    files.push({
-      path: path.relative(process.cwd(), filePath),
-      action: wrote ? "wrote" : "skipped"
-    });
+    files.push(
+      await writeOrPreview(path.join(repoPath, ".vscode", "mcp.json"), renderMcp(), {
+        dryRun,
+        force
+      })
+    );
   }
 
   if (selections.includes("vscode")) {
-    const filePath = path.join(repoPath, ".vscode", "settings.json");
-    await ensureDir(path.dirname(filePath));
-    const content = renderVscodeSettings(analysis);
-    const { wrote } = await safeWriteFile(filePath, content, force);
-    files.push({
-      path: path.relative(process.cwd(), filePath),
-      action: wrote ? "wrote" : "skipped"
-    });
+    files.push(
+      await writeOrPreview(
+        path.join(repoPath, ".vscode", "settings.json"),
+        renderVscodeSettings(analysis),
+        { dryRun, force }
+      )
+    );
   }
 
   return { files };

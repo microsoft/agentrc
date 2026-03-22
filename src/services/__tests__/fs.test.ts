@@ -3,7 +3,7 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 
-import { ensureDir, safeWriteFile } from "@agentrc/core/utils/fs";
+import { ensureDir, readJson, safeWriteFile, stripJsonComments } from "@agentrc/core/utils/fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("ensureDir", () => {
@@ -366,5 +366,78 @@ describe("safeWriteFile", () => {
       renameSpy.mockRestore();
       Object.defineProperty(process, "platform", originalPlatformDescriptor);
     }
+  });
+});
+
+describe("stripJsonComments", () => {
+  it("strips single-line comments", () => {
+    const input = '{\n  // this is a comment\n  "key": "value"\n}';
+    expect(JSON.parse(stripJsonComments(input))).toEqual({ key: "value" });
+  });
+
+  it("strips multi-line comments", () => {
+    const input = '{\n  /* multi\n     line */\n  "key": 1\n}';
+    expect(JSON.parse(stripJsonComments(input))).toEqual({ key: 1 });
+  });
+
+  it("preserves // inside string values", () => {
+    const input = '{ "url": "https://example.com" }';
+    expect(JSON.parse(stripJsonComments(input))).toEqual({ url: "https://example.com" });
+  });
+
+  it("preserves /* inside string values", () => {
+    const input = '{ "pattern": "/* glob */" }';
+    expect(JSON.parse(stripJsonComments(input))).toEqual({ pattern: "/* glob */" });
+  });
+
+  it("handles escaped quotes in strings", () => {
+    const input = '{ "msg": "say \\"hello\\"" // comment\n}';
+    expect(JSON.parse(stripJsonComments(input))).toEqual({ msg: 'say "hello"' });
+  });
+
+  it("returns plain JSON unchanged", () => {
+    const input = '{"a": 1, "b": [2, 3]}';
+    expect(stripJsonComments(input)).toBe(input);
+  });
+
+  it("returns empty string unchanged", () => {
+    expect(stripJsonComments("")).toBe("");
+  });
+
+  it("handles unterminated multi-line comment", () => {
+    const input = '{"a": 1} /* never closed';
+    expect(stripJsonComments(input)).toBe('{"a": 1} ');
+  });
+
+  it("strips trailing single-line comment without newline", () => {
+    const input = '{"a": 1} // trailing';
+    expect(stripJsonComments(input)).toBe('{"a": 1} ');
+  });
+});
+
+describe("readJson with JSONC", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "agentrc-fs-"));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("parses a JSON file with comments", async () => {
+    const filePath = path.join(tmpDir, "config.json");
+    await fs.writeFile(
+      filePath,
+      '{\n  // comment\n  "instructionFile": "AGENTS.md",\n  "cases": []\n}'
+    );
+    const result = await readJson(filePath);
+    expect(result).toEqual({ instructionFile: "AGENTS.md", cases: [] });
+  });
+
+  it("returns undefined for missing file", async () => {
+    const result = await readJson(path.join(tmpDir, "nope.json"));
+    expect(result).toBeUndefined();
   });
 });

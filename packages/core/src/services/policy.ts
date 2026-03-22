@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 
-import { readJson } from "../utils/fs";
+import { readJson, stripJsonComments } from "../utils/fs";
 
 import type { ReadinessCriterion, ReadinessContext } from "./readiness";
 
@@ -198,7 +198,7 @@ export async function loadPolicy(
     // Unsupported extension — try as JSON
     try {
       const raw = await fs.readFile(resolved, "utf8");
-      const data = JSON.parse(raw) as unknown;
+      const data = JSON.parse(stripJsonComments(raw)) as unknown;
       return validatePolicyConfig(data, source, "json");
     } catch {
       throw new Error(

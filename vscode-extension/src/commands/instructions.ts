@@ -10,7 +10,8 @@ import {
   writeNestedInstructions,
   safeWriteFile,
   analyzeRepo,
-  loadAgentrcConfig
+  loadAgentrcConfig,
+  stripJsonComments
 } from "../services.js";
 import { VscodeProgressReporter } from "../progress.js";
 import { pickWorkspacePath, getCachedAnalysis, setCachedAnalysis } from "./analyze.js";
@@ -101,7 +102,7 @@ export async function instructionsCommand(): Promise<void> {
     let existing: Record<string, unknown> = {};
     try {
       const raw = await fs.promises.readFile(configPath, "utf-8");
-      const parsed: unknown = JSON.parse(raw);
+      const parsed: unknown = JSON.parse(stripJsonComments(raw));
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
         existing = parsed as Record<string, unknown>;
       }

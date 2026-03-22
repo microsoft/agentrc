@@ -86,6 +86,7 @@ export function runCli(argv: string[]): void {
     .option("--per-app", "(deprecated) Use `agentrc instructions --areas` instead")
     .option("--model <name>", "Model for instructions generation", DEFAULT_MODEL)
     .option("--strategy <mode>", "Instruction strategy (flat or nested)")
+    .option("--dry-run", "Preview generated files without writing anything")
     .action(withGlobalOpts(generateCommand));
 
   program

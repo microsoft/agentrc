@@ -31,11 +31,9 @@ export async function initCommand(): Promise<void> {
         const analysis = await analyzeRepo(workspacePath);
         setCachedAnalysis(analysis);
 
-        // Scaffold agentrc.config.json if areas were detected and file doesn't exist yet
-        if (analysis.areas && analysis.areas.length > 0) {
-          reporter.update("Scaffolding config…");
-          await scaffoldAgentrcConfig(workspacePath, analysis.areas, false);
-        }
+        // Scaffold agentrc.config.json (minimal config if no areas detected)
+        reporter.update("Scaffolding config…");
+        await scaffoldAgentrcConfig(workspacePath, analysis.areas ?? [], false);
 
         reporter.update("Generating instructions…");
         const instructionsContent = await generateCopilotInstructions({

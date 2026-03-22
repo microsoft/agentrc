@@ -231,14 +231,16 @@ export async function initCommand(
   allFiles.push(...genResult.files);
 
   // Bootstrap agentrc.config.json with detected workspaces and standalone areas
-  if (analysis.areas && analysis.areas.length > 0) {
-    const result = await scaffoldAgentrcConfig(repoPath, analysis.areas, Boolean(options.force));
-    if (result) {
-      const rel = path.relative(process.cwd(), result.configPath);
-      allFiles.push({ path: rel, action: result.wrote ? "wrote" : "skipped" });
-      if (shouldLog(options)) {
-        process.stderr.write((result.wrote ? `Wrote ${rel}` : `Skipped ${rel} (exists)`) + "\n");
-      }
+  {
+    const result = await scaffoldAgentrcConfig(
+      repoPath,
+      analysis.areas ?? [],
+      Boolean(options.force)
+    );
+    const rel = path.relative(process.cwd(), result.configPath);
+    allFiles.push({ path: rel, action: result.wrote ? "wrote" : "skipped" });
+    if (shouldLog(options)) {
+      process.stderr.write((result.wrote ? `Wrote ${rel}` : `Skipped ${rel} (exists)`) + "\n");
     }
   }
 

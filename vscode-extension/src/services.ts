@@ -24,5 +24,5 @@ export {
   getRepo as getAzureDevOpsRepo
 } from "@agentrc/core/services/azureDevops";
 export { isAgentrcFile } from "@agentrc/core/utils/pr";
-export { safeWriteFile } from "@agentrc/core/utils/fs";
+export { safeWriteFile, stripJsonComments } from "@agentrc/core/utils/fs";
 export { DEFAULT_MODEL } from "@agentrc/core/config";

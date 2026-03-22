@@ -1,16 +1,24 @@
 {
   "instructionFile": ".github/copilot-instructions.md",
-  "systemMessage": "You are answering questions about this repository. Use tools to inspect the repo and cite its files. Avoid generic Copilot CLI details unless the prompt explicitly asks for them.",
+  "systemMessage": "Research using read-only tools and make a plan for the given task, including concrete implementation steps and verification steps.",
   "cases": [
     {
-      "id": "project-overview",
-      "prompt": "Summarize what this project does and list the main entry points.",
-      "expectation": "Should mention the primary purpose and key files/directories."
+      "id": "add-feature",
+      "prompt": "Write a plan for: Add a new CLI command that lists all detected areas in a repository.",
+      "expectation": [
+        "Describe which files to create/modify, how the command wires into the CLI, and how it calls the analyzer service.",
+        "Implementation steps: create a new command file in src/commands/, call analyzer to detect areas, format and output the area list using output utilities.",
+        "Verification: typecheck passes, unit test for the command, manual test against a monorepo."
+      ]
     },
     {
-      "id": "build-commands",
-      "prompt": "How do I build and test this project?",
-      "expectation": "Should provide the correct build and test commands from package.json or equivalent."
+      "id": "refactor-task",
+      "prompt": "How would I refactor the build configuration to support multiple output targets (CJS and ESM)?",
+      "expectation": [
+        "Reference the current tsup config, explain what changes are needed for dual output, and address how imports and package.json exports would need to change.",
+        "Implementation steps: update tsup.config.ts for both CJS and ESM bundles, add package.json exports map, verify bundled dependencies work in both formats.",
+        "Verification: build produces both formats, imports work in CJS and ESM consumers, existing tests pass."
+      ]
     }
   ]
 }
