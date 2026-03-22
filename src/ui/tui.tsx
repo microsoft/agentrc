@@ -66,8 +66,18 @@ function useTerminalColumns(): number {
   const { stdout } = useStdout();
   const [columns, setColumns] = useState(stdout.columns ?? 80);
   useEffect(() => {
-    const onResize = () => setColumns(stdout.columns ?? 80);
-    stdout.on("resize", onResize);
+    const onResize = () => {
+      // Terminal reflow on resize invalidates Ink's line-position tracking,
+      // causing ghost artifacts ("screen cheese"). We use prependListener so
+      // this fires BEFORE Ink's own resize handler, clearing the screen
+      // before Ink re-renders — avoiding a wasted double-paint.
+      stdout.write("\x1b[2J\x1b[H");
+      setColumns(stdout.columns ?? 80);
+    };
+    // prependListener ensures our clear runs before Ink's resized() handler,
+    // which only clears on width decrease. This covers width increase and
+    // height-only changes where Ink's log-update state goes stale.
+    stdout.prependListener("resize", onResize);
     return () => {
       stdout.off("resize", onResize);
     };
