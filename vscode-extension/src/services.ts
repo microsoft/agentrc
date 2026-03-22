@@ -1,4 +1,5 @@
 export { analyzeRepo, loadAgentrcConfig, detectWorkspaces } from "@agentrc/core/services/analyzer";
+export { scaffoldAgentrcConfig } from "@agentrc/core/services/configScaffold";
 export { generateConfigs } from "@agentrc/core/services/generator";
 export {
   generateCopilotInstructions,

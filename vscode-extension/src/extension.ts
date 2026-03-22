@@ -7,7 +7,11 @@ import { evalCommand, evalInitCommand } from "./commands/eval.js";
 import { initCommand } from "./commands/init.js";
 import { prCommand } from "./commands/pr.js";
 import { batchInstructionsCommand } from "./commands/batch.js";
-import { analysisTreeProvider, readinessTreeProvider, workspaceStatusTreeProvider } from "./views/providers.js";
+import {
+  analysisTreeProvider,
+  readinessTreeProvider,
+  workspaceStatusTreeProvider
+} from "./views/providers.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   // Status bar — only show after analysis

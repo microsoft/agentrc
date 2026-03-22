@@ -237,9 +237,7 @@ export async function initCommand(
       const rel = path.relative(process.cwd(), result.configPath);
       allFiles.push({ path: rel, action: result.wrote ? "wrote" : "skipped" });
       if (shouldLog(options)) {
-        process.stderr.write(
-          (result.wrote ? `Wrote ${rel}` : `Skipped ${rel} (exists)`) + "\n"
-        );
+        process.stderr.write((result.wrote ? `Wrote ${rel}` : `Skipped ${rel} (exists)`) + "\n");
       }
     }
   }

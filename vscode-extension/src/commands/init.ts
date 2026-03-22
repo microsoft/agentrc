@@ -4,7 +4,8 @@ import {
   analyzeRepo,
   generateConfigs,
   generateCopilotInstructions,
-  safeWriteFile
+  safeWriteFile,
+  scaffoldAgentrcConfig
 } from "../services.js";
 import { VscodeProgressReporter } from "../progress.js";
 import { pickWorkspacePath, setCachedAnalysis } from "./analyze.js";
@@ -29,6 +30,12 @@ export async function initCommand(): Promise<void> {
         reporter.update("Analyzing repository…");
         const analysis = await analyzeRepo(workspacePath);
         setCachedAnalysis(analysis);
+
+        // Scaffold agentrc.config.json if areas were detected and file doesn't exist yet
+        if (analysis.areas && analysis.areas.length > 0) {
+          reporter.update("Scaffolding config…");
+          await scaffoldAgentrcConfig(workspacePath, analysis.areas, false);
+        }
 
         reporter.update("Generating instructions…");
         const instructionsContent = await generateCopilotInstructions({

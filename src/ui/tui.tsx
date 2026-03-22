@@ -881,8 +881,7 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
                 }
               } catch (error) {
                 setStatus("error");
-                const msg =
-                  error instanceof Error ? error.message : "Failed to create config.";
+                const msg = error instanceof Error ? error.message : "Failed to create config.";
                 setMessage(msg);
                 addLog(msg, "error");
               }
@@ -1383,7 +1382,7 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
             <Box>
               <KeyHint k="M" label="Model" />
               <KeyHint k="J" label="Judge" />
-              {!hasAgentrcConfig && <KeyHint k="C" label="Create config" />}
+              {hasAgentrcConfig === false && <KeyHint k="C" label="Create config" />}
               <KeyHint k="Q" label="Quit" />
             </Box>
           </Box>

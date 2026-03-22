@@ -1,11 +1,9 @@
-import fs from "fs/promises";
-import path from "path";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 import * as vscode from "vscode";
 
-export class WorkspaceStatusTreeProvider
-  implements vscode.TreeDataProvider<WorkspaceStatusItem>
-{
+export class WorkspaceStatusTreeProvider implements vscode.TreeDataProvider<WorkspaceStatusItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<WorkspaceStatusItem | undefined>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
@@ -18,10 +16,37 @@ export class WorkspaceStatusTreeProvider
   }
 
   async getChildren(element?: WorkspaceStatusItem): Promise<WorkspaceStatusItem[]> {
-    if (element) return [];
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) return [];
-    return Promise.all([this.buildConfigItem(root), this.buildEvalItem(root)]);
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    if (folders.length === 0) return [];
+
+    // If element is a folder group, return its children
+    if (element?.children) return element.children;
+
+    // Single folder: flat list of status items
+    if (folders.length === 1) {
+      return Promise.all([
+        this.buildConfigItem(folders[0].uri.fsPath),
+        this.buildEvalItem(folders[0].uri.fsPath)
+      ]);
+    }
+
+    // Multi-root: one collapsible group per folder
+    return Promise.all(
+      folders.map(async (folder) => {
+        const [configItem, evalItem] = await Promise.all([
+          this.buildConfigItem(folder.uri.fsPath),
+          this.buildEvalItem(folder.uri.fsPath)
+        ]);
+        const group = new WorkspaceStatusItem(
+          folder.name,
+          vscode.TreeItemCollapsibleState.Expanded,
+          [configItem, evalItem]
+        );
+        group.iconPath = new vscode.ThemeIcon("folder");
+        group.contextValue = "folderGroup";
+        return group;
+      })
+    );
   }
 
   private async buildConfigItem(root: string): Promise<WorkspaceStatusItem> {
@@ -38,23 +63,17 @@ export class WorkspaceStatusTreeProvider
       )
     ).then((results) => results.some(Boolean));
 
-    const item = new WorkspaceStatusItem(
-      "Config",
-      vscode.TreeItemCollapsibleState.None
-    );
+    const item = new WorkspaceStatusItem("Config", vscode.TreeItemCollapsibleState.None);
     item.iconPath = new vscode.ThemeIcon(
       "settings-gear",
-      found
-        ? new vscode.ThemeColor("charts.green")
-        : new vscode.ThemeColor("charts.yellow")
+      found ? new vscode.ThemeColor("charts.green") : new vscode.ThemeColor("charts.yellow")
     );
     if (found) {
       item.description = "agentrc.config.json found";
       item.tooltip = "agentrc.config.json is present. Run agentrc init to regenerate.";
     } else {
       item.description = "not found — click to create";
-      item.tooltip =
-        "No agentrc.config.json found. Click to run agentrc init and scaffold one.";
+      item.tooltip = "No agentrc.config.json found. Click to run agentrc init and scaffold one.";
       item.command = {
         command: "agentrc.init",
         title: "Create agentrc.config.json"
@@ -70,15 +89,10 @@ export class WorkspaceStatusTreeProvider
       () => false
     );
 
-    const item = new WorkspaceStatusItem(
-      "Evals",
-      vscode.TreeItemCollapsibleState.None
-    );
+    const item = new WorkspaceStatusItem("Evals", vscode.TreeItemCollapsibleState.None);
     item.iconPath = new vscode.ThemeIcon(
       "beaker",
-      found
-        ? new vscode.ThemeColor("charts.green")
-        : new vscode.ThemeColor("charts.yellow")
+      found ? new vscode.ThemeColor("charts.green") : new vscode.ThemeColor("charts.yellow")
     );
     if (found) {
       item.description = "agentrc.eval.json found";
@@ -96,7 +110,11 @@ export class WorkspaceStatusTreeProvider
 }
 
 class WorkspaceStatusItem extends vscode.TreeItem {
-  constructor(label: string, collapsibleState: vscode.TreeItemCollapsibleState) {
+  constructor(
+    label: string,
+    collapsibleState: vscode.TreeItemCollapsibleState,
+    public readonly children?: WorkspaceStatusItem[]
+  ) {
     super(label, collapsibleState);
   }
 }
