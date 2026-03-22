@@ -295,6 +295,24 @@ export async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
+/**
+ * Predict whether safeWriteFile would actually write the file, using the same
+ * preflight checks (symlink ancestor, existing file, force flag) without
+ * performing any I/O mutations. Useful for dry-run previews.
+ */
+export async function canSafeWrite(filePath: string, force: boolean): Promise<boolean> {
+  const resolved = path.resolve(filePath);
+  if (await hasSymlinkAncestor(resolved)) return false;
+  try {
+    const stat = await fs.lstat(resolved);
+    if (stat.isSymbolicLink()) return false;
+    return force;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
+    throw error;
+  }
+}
+
 export async function safeReadDir(dirPath: string): Promise<string[]> {
   try {
     return await fs.readdir(dirPath);

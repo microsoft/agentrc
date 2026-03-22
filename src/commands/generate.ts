@@ -85,7 +85,7 @@ export async function generateCommand(
     const { ok, status } = deriveFileStatus(genResult.files);
     const result: CommandResult<{ type: string; files: FileAction[]; dryRun?: boolean }> = {
       ok,
-      status: options.dryRun ? "noop" : status,
+      status,
       data: { type, files: genResult.files, dryRun: options.dryRun }
     };
     outputResult(result, true);

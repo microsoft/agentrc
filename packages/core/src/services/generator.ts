@@ -1,6 +1,6 @@
 import path from "path";
 
-import { ensureDir, fileExists, safeWriteFile } from "../utils/fs";
+import { canSafeWrite, ensureDir, safeWriteFile } from "../utils/fs";
 
 import type { RepoAnalysis } from "./analyzer";
 
@@ -29,10 +29,10 @@ async function writeOrPreview(
 ): Promise<FileAction> {
   const relPath = path.relative(process.cwd(), filePath);
   if (opts.dryRun) {
-    const exists = await fileExists(filePath);
+    const wouldWrite = await canSafeWrite(filePath, opts.force);
     return {
       path: relPath,
-      action: !exists || opts.force ? "wrote" : "skipped",
+      action: wouldWrite ? "wrote" : "skipped",
       bytes: Buffer.byteLength(content, "utf8")
     };
   }

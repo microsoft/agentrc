@@ -241,12 +241,10 @@ function normalizeEvalConfig(parsed: EvalConfig, count: number, hasAreas = true)
   };
 }
 
-function normalizeExpectation(value: string | string[] | undefined): string {
+function normalizeExpectation(value: string | string[] | undefined): string | string[] {
   if (Array.isArray(value)) {
-    return value
-      .map((s) => String(s).trim())
-      .filter(Boolean)
-      .join("\n");
+    const items = value.map((s) => String(s).trim()).filter(Boolean);
+    return items.length === 1 ? items[0] : items;
   }
   return String(value ?? "").trim();
 }
