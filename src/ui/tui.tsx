@@ -64,6 +64,7 @@ const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", 
 /** Track terminal columns reactively so resize triggers a re-render. */
 function useTerminalColumns(): number {
   const { stdout } = useStdout();
+  const accessible = useIsScreenReaderEnabled();
   const [columns, setColumns] = useState(stdout.columns ?? 80);
   useEffect(() => {
     const onResize = () => {
@@ -71,7 +72,10 @@ function useTerminalColumns(): number {
       // causing ghost artifacts ("screen cheese"). We use prependListener so
       // this fires BEFORE Ink's own resize handler, clearing the screen
       // before Ink re-renders — avoiding a wasted double-paint.
-      stdout.write("\x1b[2J\x1b[H");
+      // Skip in accessible mode to avoid screen readers announcing escape noise.
+      if (!accessible) {
+        stdout.write("\x1b[2J\x1b[H");
+      }
       setColumns(stdout.columns ?? 80);
     };
     // prependListener ensures our clear runs before Ink's resized() handler,
@@ -81,7 +85,7 @@ function useTerminalColumns(): number {
     return () => {
       stdout.off("resize", onResize);
     };
-  }, [stdout]);
+  }, [stdout, accessible]);
   return columns;
 }
 
