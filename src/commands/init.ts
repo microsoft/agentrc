@@ -1,7 +1,6 @@
 import path from "path";
 
-import { analyzeRepo, detectWorkspaces } from "@agentrc/core/services/analyzer";
-import type { AgentrcConfig, AgentrcConfigArea } from "@agentrc/core/services/analyzer";
+import { analyzeRepo } from "@agentrc/core/services/analyzer";
 import type {
   AzureDevOpsOrg,
   AzureDevOpsProject,
@@ -13,6 +12,7 @@ import {
   listProjects,
   listRepos
 } from "@agentrc/core/services/azureDevops";
+import { scaffoldAgentrcConfig } from "@agentrc/core/services/configScaffold";
 import type { FileAction } from "@agentrc/core/services/generator";
 import { generateConfigs } from "@agentrc/core/services/generator";
 import { buildAuthedUrl, cloneRepo, isGitRepo, setRemoteUrl } from "@agentrc/core/services/git";
@@ -232,36 +232,14 @@ export async function initCommand(
 
   // Bootstrap agentrc.config.json with detected workspaces and standalone areas
   if (analysis.areas && analysis.areas.length > 0) {
-    const configPath = path.join(repoPath, "agentrc.config.json");
-    const workspaces = await detectWorkspaces(repoPath, analysis.areas);
-
-    // Areas already claimed by a workspace (match by path prefix, not name)
-    const workspacePaths = workspaces.map((ws) => ws.path + "/");
-
-    // Standalone areas not inside any workspace
-    const standaloneAreas: AgentrcConfigArea[] = analysis.areas
-      .filter((a) => {
-        if (!a.path) return true;
-        const rel = path.relative(repoPath, a.path).replace(/\\/gu, "/");
-        return !workspacePaths.some((prefix) => rel.startsWith(prefix));
-      })
-      .map((a) => ({
-        name: a.name,
-        applyTo: a.applyTo,
-        ...(a.description ? { description: a.description } : {})
-      }));
-
-    const agentrcConfig: AgentrcConfig = {};
-    if (workspaces.length > 0) agentrcConfig.workspaces = workspaces;
-    if (standaloneAreas.length > 0) agentrcConfig.areas = standaloneAreas;
-
-    if (agentrcConfig.workspaces || agentrcConfig.areas) {
-      const configContent = JSON.stringify(agentrcConfig, null, 2) + "\n";
-      const { wrote } = await safeWriteFile(configPath, configContent, Boolean(options.force));
-      const rel = path.relative(process.cwd(), configPath);
-      allFiles.push({ path: rel, action: wrote ? "wrote" : "skipped" });
+    const result = await scaffoldAgentrcConfig(repoPath, analysis.areas, Boolean(options.force));
+    if (result) {
+      const rel = path.relative(process.cwd(), result.configPath);
+      allFiles.push({ path: rel, action: result.wrote ? "wrote" : "skipped" });
       if (shouldLog(options)) {
-        process.stderr.write((wrote ? `Wrote ${rel}` : `Skipped ${rel} (exists)`) + "\n");
+        process.stderr.write(
+          (result.wrote ? `Wrote ${rel}` : `Skipped ${rel} (exists)`) + "\n"
+        );
       }
     }
   }

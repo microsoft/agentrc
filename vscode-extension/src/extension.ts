@@ -7,7 +7,7 @@ import { evalCommand, evalInitCommand } from "./commands/eval.js";
 import { initCommand } from "./commands/init.js";
 import { prCommand } from "./commands/pr.js";
 import { batchInstructionsCommand } from "./commands/batch.js";
-import { analysisTreeProvider, readinessTreeProvider } from "./views/providers.js";
+import { analysisTreeProvider, readinessTreeProvider, workspaceStatusTreeProvider } from "./views/providers.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   // Status bar — only show after analysis
@@ -18,13 +18,16 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(statusBar);
 
   // Tree views (createTreeView for description/badge support)
+  const workspaceView = vscode.window.createTreeView("agentrc.workspace", {
+    treeDataProvider: workspaceStatusTreeProvider
+  });
   const analysisView = vscode.window.createTreeView("agentrc.analysis", {
     treeDataProvider: analysisTreeProvider
   });
   const readinessView = vscode.window.createTreeView("agentrc.readiness", {
     treeDataProvider: readinessTreeProvider
   });
-  context.subscriptions.push(analysisView, readinessView);
+  context.subscriptions.push(workspaceView, analysisView, readinessView);
 
   function updateAnalysisView(): void {
     const analysis = getCachedAnalysis();
@@ -74,10 +77,14 @@ export function activate(context: vscode.ExtensionContext): void {
       updateStatusBar();
     }),
     vscode.commands.registerCommand("agentrc.eval", evalCommand),
-    vscode.commands.registerCommand("agentrc.evalInit", evalInitCommand),
+    vscode.commands.registerCommand("agentrc.evalInit", async () => {
+      await evalInitCommand();
+      workspaceStatusTreeProvider.refresh();
+    }),
     vscode.commands.registerCommand("agentrc.init", async () => {
       await initCommand();
       analysisTreeProvider.refresh();
+      workspaceStatusTreeProvider.refresh();
       updateAnalysisView();
       updateStatusBar();
       vscode.commands.executeCommand("agentrc.analysis.focus");

@@ -4,6 +4,7 @@ import path from "path";
 import type { RepoApp, Area } from "@agentrc/core/services/analyzer";
 import { analyzeRepo, loadAgentrcConfig } from "@agentrc/core/services/analyzer";
 import { getAzureDevOpsToken } from "@agentrc/core/services/azureDevops";
+import { scaffoldAgentrcConfig } from "@agentrc/core/services/configScaffold";
 import { listCopilotModels } from "@agentrc/core/services/copilot";
 import { generateEvalScaffold } from "@agentrc/core/services/evalScaffold";
 import type { EvalConfig } from "@agentrc/core/services/evalScaffold";
@@ -184,6 +185,7 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
   const [modelPickTarget, setModelPickTarget] = useState<"eval" | "judge">("eval");
   const [modelCursor, setModelCursor] = useState(0);
   const [hasEvalConfig, setHasEvalConfig] = useState<boolean | null>(null);
+  const [hasAgentrcConfig, setHasAgentrcConfig] = useState<boolean | null>(null);
   const [activityLog, setActivityLog] = useState<LogEntry[]>([]);
   const [generateTarget, setGenerateTarget] = useState<"copilot-instructions" | "agents-md">(
     "copilot-instructions"
@@ -219,12 +221,26 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
     setStatus("idle");
   };
 
-  // Check for eval config and repo structure on mount
+  // Check for eval config, agentrc config, and repo structure on mount
   useEffect(() => {
     const configPath = path.join(repoPath, "agentrc.eval.json");
     fs.access(configPath)
       .then(() => setHasEvalConfig(true))
       .catch(() => setHasEvalConfig(false));
+    const agentrcConfigCandidates = [
+      path.join(repoPath, "agentrc.config.json"),
+      path.join(repoPath, ".github", "agentrc.config.json")
+    ];
+    Promise.all(
+      agentrcConfigCandidates.map((p) =>
+        fs
+          .access(p)
+          .then(() => true)
+          .catch(() => false)
+      )
+    )
+      .then((results) => setHasAgentrcConfig(results.some(Boolean)))
+      .catch(() => setHasAgentrcConfig(false));
     analyzeRepo(repoPath)
       .then((analysis) => {
         const apps = analysis.apps ?? [];
@@ -233,6 +249,7 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
         setRepoAreas(analysis.areas ?? []);
       })
       .catch((err) => {
+        setRepoAreas([]);
         addLog(`Repo analysis failed: ${err instanceof Error ? err.message : "unknown"}`, "error");
       });
   }, [repoPath]);
@@ -832,6 +849,46 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
               return;
             }
 
+            if (input.toLowerCase() === "c") {
+              if (hasAgentrcConfig) {
+                setMessage("agentrc.config.json already exists.");
+                return;
+              }
+              if (repoAreas.length === 0) {
+                setMessage("No areas detected. Cannot scaffold agentrc.config.json.");
+                return;
+              }
+              setStatus("generating");
+              setMessage("Creating agentrc.config.json...");
+              addLog("Scaffolding agentrc.config.json...", "progress");
+              try {
+                const result = await scaffoldAgentrcConfig(repoPath, repoAreas);
+                if (!result) {
+                  setStatus("idle");
+                  setMessage("Nothing to scaffold — no areas or workspaces detected.");
+                  addLog("No areas to scaffold into config.", "info");
+                } else if (result.wrote) {
+                  setHasAgentrcConfig(true);
+                  setStatus("done");
+                  const msg = `Created agentrc.config.json`;
+                  setMessage(msg);
+                  addLog(msg, "success");
+                } else {
+                  setHasAgentrcConfig(true);
+                  setStatus("idle");
+                  setMessage("agentrc.config.json already exists (skipped).");
+                  addLog("agentrc.config.json already exists.", "info");
+                }
+              } catch (error) {
+                setStatus("error");
+                const msg =
+                  error instanceof Error ? error.message : "Failed to create config.";
+                setMessage(msg);
+                addLog(msg, "error");
+              }
+              return;
+            }
+
             if (input.toLowerCase() === "m") {
               if (hideModelPicker) {
                 setMessage(
@@ -1009,6 +1066,18 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
             <Text color="green">agentrc.eval.json found</Text>
           ) : (
             <Text color="yellow">no eval config — press [I] to create</Text>
+          )}
+        </Text>
+        <Text>
+          <Text color="gray">Config </Text>
+          {hasAgentrcConfig === null ? (
+            <Text color="gray" dimColor>
+              checking...
+            </Text>
+          ) : hasAgentrcConfig ? (
+            <Text color="green">agentrc.config.json found</Text>
+          ) : (
+            <Text color="yellow">no config — press [C] to create</Text>
           )}
         </Text>
       </Box>
@@ -1314,6 +1383,7 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
             <Box>
               <KeyHint k="M" label="Model" />
               <KeyHint k="J" label="Judge" />
+              {!hasAgentrcConfig && <KeyHint k="C" label="Create config" />}
               <KeyHint k="Q" label="Quit" />
             </Box>
           </Box>

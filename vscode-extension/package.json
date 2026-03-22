@@ -95,6 +95,11 @@
     "views": {
       "agentrc": [
         {
+          "id": "agentrc.workspace",
+          "name": "Workspace",
+          "contextualTitle": "AgentRC"
+        },
+        {
           "id": "agentrc.analysis",
           "name": "Analysis",
           "contextualTitle": "AgentRC"
@@ -107,6 +112,11 @@
       ]
     },
     "viewsWelcome": [
+      {
+        "view": "agentrc.workspace",
+        "contents": "Open a folder to get started.\n[$(folder-opened) Open Folder](command:vscode.openFolder)",
+        "when": "workspaceFolderCount == 0"
+      },
       {
         "view": "agentrc.analysis",
         "contents": "Discover languages, frameworks, and project structure in your repository.\n[$(search) Analyze Repository](command:agentrc.analyze)\nNew to AgentRC? [Get Started](command:workbench.action.openWalkthrough?%5B%22microsoft.agentrc-vscode%23agentrc.gettingStarted%22%5D)",
