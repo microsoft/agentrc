@@ -1,6 +1,6 @@
 import * as esbuild from "esbuild";
 import { readFile } from "node:fs/promises";
-import { cpSync } from "node:fs";
+import { cpSync, rmSync } from "node:fs";
 
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
@@ -62,6 +62,7 @@ const copySkillAssets = {
   name: "copy-skill-assets",
   setup(build) {
     build.onEnd(() => {
+      rmSync("out/skills", { recursive: true, force: true });
       cpSync("../plugin/skills", "out/skills", { recursive: true });
     });
   }

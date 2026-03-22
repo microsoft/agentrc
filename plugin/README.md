@@ -23,7 +23,11 @@ https://github.com/microsoft/agentrc
 
 ### From marketplace
 
-This repository is also listed as a plugin marketplace. Add the marketplace URL to discover and install the plugin.
+This repository is also listed as a plugin marketplace. Point VS Code at the raw marketplace manifest to discover and install the plugin:
+
+```
+https://raw.githubusercontent.com/microsoft/agentrc/main/.github/plugin/marketplace.json
+```
 
 ## Usage
 
