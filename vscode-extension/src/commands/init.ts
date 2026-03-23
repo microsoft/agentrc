@@ -26,6 +26,7 @@ export async function initCommand(): Promise<void> {
     async (progress) => {
       try {
         const reporter = new VscodeProgressReporter(progress);
+        const instructionsPath = path.join(workspacePath, ".github", "copilot-instructions.md");
 
         reporter.update("Analyzing repository…");
         const analysis = await analyzeRepo(workspacePath);
@@ -45,7 +46,6 @@ export async function initCommand(): Promise<void> {
         let skippedInstructions = false;
 
         if (instructionsContent.trim()) {
-          const instructionsPath = path.join(workspacePath, ".github", "copilot-instructions.md");
           const dir = path.dirname(instructionsPath);
           await vscode.workspace.fs.createDirectory(vscode.Uri.file(dir));
           const { wrote } = await safeWriteFile(instructionsPath, instructionsContent, false);
@@ -81,8 +81,7 @@ export async function initCommand(): Promise<void> {
               reporter.update("Overwriting configs…");
 
               if (instructionsContent.trim()) {
-                const instrPath = path.join(workspacePath, ".github", "copilot-instructions.md");
-                await safeWriteFile(instrPath, instructionsContent, true);
+                await safeWriteFile(instructionsPath, instructionsContent, true);
               }
 
               await generateConfigs({
@@ -93,11 +92,6 @@ export async function initCommand(): Promise<void> {
               });
               reporter.succeed("Configs overwritten.");
 
-              const instructionsPath = path.join(
-                workspacePath,
-                ".github",
-                "copilot-instructions.md"
-              );
               try {
                 const doc = await vscode.workspace.openTextDocument(instructionsPath);
                 await vscode.window.showTextDocument(doc);
@@ -122,7 +116,6 @@ export async function initCommand(): Promise<void> {
 
         reporter.succeed("Repository initialized.");
 
-        const instructionsPath = path.join(workspacePath, ".github", "copilot-instructions.md");
         try {
           const doc = await vscode.workspace.openTextDocument(instructionsPath);
           await vscode.window.showTextDocument(doc);

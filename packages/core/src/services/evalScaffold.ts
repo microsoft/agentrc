@@ -185,8 +185,7 @@ export async function generateEvalScaffold(options: EvalScaffoldOptions): Promis
     }
 
     const hasAreas = Boolean(options.areas?.length);
-    const normalized = normalizeEvalConfig(parsed, count, hasAreas);
-    return normalized;
+    return normalizeEvalConfig(parsed, count, hasAreas);
   } finally {
     await client.stop();
   }
