@@ -302,7 +302,7 @@
   ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@github/copilot-sdk": "^0.1.32",
+    "@github/copilot-sdk": "^0.2.0",
     "@octokit/rest": "^22.0.1",
     "@typescript-eslint/eslint-plugin": "^8.57.1",
     "@typescript-eslint/parser": "^8.56.0",

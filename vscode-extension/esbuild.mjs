@@ -6,32 +6,34 @@ const watch = process.argv.includes("--watch");
 
 /**
  * esbuild plugin: neutralise the SDK's getBundledCliPath() which calls
- * import.meta.resolve("@github/copilot/sdk"). In CJS bundles esbuild replaces
- * import.meta with {}, making .resolve undefined and crashing at runtime.
- * AgentRC always passes an explicit cliPath so this function is dead code, but
- * the SDK constructor still evaluates it as a default value.
+ * import.meta.resolve() and createRequire(__filename). In CJS bundles esbuild
+ * replaces import.meta with {}, making .resolve undefined and crashing at
+ * runtime. AgentRC always passes an explicit cliPath so this function is dead
+ * code, but the SDK constructor still evaluates it as a default value.
  *
- * Validated against @github/copilot-sdk ^0.1.24–0.1.29.
+ * Validated against @github/copilot-sdk 0.1.24–0.2.0.
  * If the SDK changes getBundledCliPath internals the build will fail with
  * a clear error message below.
  */
-const SDK_SHIM_TARGET =
-  'const sdkUrl = import.meta.resolve("@github/copilot/sdk");\n  const sdkPath = fileURLToPath(sdkUrl);\n  return join(dirname(dirname(sdkPath)), "index.js");';
+const SDK_FN_RE = /function getBundledCliPath\(\) \{[\s\S]*?\n\}/;
 
 const shimSdkImportMeta = {
   name: "shim-sdk-import-meta",
   setup(build) {
     build.onLoad({ filter: /copilot-sdk[\\/]dist[\\/]client\.js$/ }, async (args) => {
-      let contents = await readFile(args.path, "utf8");
-      if (!contents.includes(SDK_SHIM_TARGET)) {
+      const original = await readFile(args.path, "utf8");
+      const contents = original.replace(
+        SDK_FN_RE,
+        'function getBundledCliPath() {\n  return "bundled-cli-unavailable";\n}'
+      );
+      if (contents === original) {
         throw new Error(
           "[shim-sdk-import-meta] SDK internals changed — getBundledCliPath() " +
-            "target string not found in " +
+            "not found in " +
             args.path +
-            ". Update the shim to match the new SDK version."
+            ". Update the shim in tsup.config.ts and vscode-extension/esbuild.mjs."
         );
       }
-      contents = contents.replace(SDK_SHIM_TARGET, 'return "bundled-cli-unavailable";');
       return { contents, loader: "js" };
     });
   }
