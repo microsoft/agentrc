@@ -278,7 +278,7 @@ export function buildCriteria(): ReadinessCriterion[] {
           status: found ? "pass" : "fail",
           reason: found
             ? undefined
-            : "No branch ruleset or protection config found (.github/rulesets/*.json). Add branch protection rules to prevent unreviewed merges.",
+            : "No branch ruleset or protection config found (.github/rulesets/*.json or .github/branch-protection.json). Add branch protection rules to prevent unreviewed merges.",
           evidence: [".github/rulesets/*.json", ".github/branch-protection.json"]
         };
       }
