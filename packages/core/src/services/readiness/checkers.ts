@@ -271,6 +271,145 @@ export async function hasCopilotSkills(repoPath: string): Promise<string[]> {
   return found;
 }
 
+export async function hasIssueTemplates(repoPath: string): Promise<boolean> {
+  const single = await fileExists(path.join(repoPath, ".github", "ISSUE_TEMPLATE.md"));
+  if (single) return true;
+  const dir = path.join(repoPath, ".github", "ISSUE_TEMPLATE");
+  try {
+    const entries = await fs.readdir(dir);
+    return entries.some((e) => /\.(md|yml|yaml)$/iu.test(e));
+  } catch {
+    return false;
+  }
+}
+
+export async function hasCommitConvention(repoPath: string): Promise<boolean> {
+  const configs = [
+    ".commitlintrc",
+    ".commitlintrc.json",
+    ".commitlintrc.yml",
+    ".commitlintrc.yaml",
+    ".commitlintrc.js",
+    ".commitlintrc.cjs",
+    ".commitlintrc.mjs",
+    ".commitlintrc.ts",
+    "commitlint.config.js",
+    "commitlint.config.cjs",
+    "commitlint.config.mjs",
+    "commitlint.config.ts",
+    ".cz-config.js",
+    ".czrc"
+  ];
+  for (const config of configs) {
+    if (await fileExists(path.join(repoPath, config))) return true;
+  }
+  const pkg = await readJson(path.join(repoPath, "package.json"));
+  if (pkg) {
+    const allDeps = {
+      ...((pkg.dependencies as Record<string, unknown>) ?? {}),
+      ...((pkg.devDependencies as Record<string, unknown>) ?? {})
+    };
+    if (
+      Object.keys(allDeps).some(
+        (dep) => dep.startsWith("@commitlint/") || dep === "commitlint" || dep === "commitizen"
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export async function hasReleaseAutomation(
+  repoPath: string
+): Promise<{ found: boolean; evidence: string[] }> {
+  const evidence: string[] = [];
+  const configs = [
+    "release.config.js",
+    "release.config.cjs",
+    "release.config.mjs",
+    "release.config.ts",
+    ".releaserc",
+    ".releaserc.json",
+    ".releaserc.yml",
+    ".releaserc.yaml",
+    ".releaserc.js",
+    ".releaserc.cjs",
+    ".changeset/config.json",
+    "release-please-config.json"
+  ];
+  for (const config of configs) {
+    if (await fileExists(path.join(repoPath, config))) {
+      evidence.push(config);
+    }
+  }
+  const workflowsDir = path.join(repoPath, ".github", "workflows");
+  try {
+    const workflows = await fs.readdir(workflowsDir);
+    for (const workflow of workflows) {
+      if (!/\.ya?ml$/iu.test(workflow)) continue;
+      try {
+        const content = await fs.readFile(path.join(workflowsDir, workflow), "utf8");
+        if (
+          content.includes("semantic-release") ||
+          content.includes("changesets/action") ||
+          content.includes("googleapis/release-please-action")
+        ) {
+          evidence.push(`.github/workflows/${workflow}`);
+        }
+      } catch {
+        // skip unreadable workflow
+      }
+    }
+  } catch {
+    // no workflows directory
+  }
+  return { found: evidence.length > 0, evidence };
+}
+
+export async function hasAutoLabeler(repoPath: string): Promise<boolean> {
+  for (const file of [".github/labeler.yml", ".github/labeler.yaml", ".github/labeler.json"]) {
+    if (await fileExists(path.join(repoPath, file))) return true;
+  }
+  const workflowsDir = path.join(repoPath, ".github", "workflows");
+  try {
+    const workflows = await fs.readdir(workflowsDir);
+    for (const workflow of workflows) {
+      if (!/\.ya?ml$/iu.test(workflow)) continue;
+      try {
+        const content = await fs.readFile(path.join(workflowsDir, workflow), "utf8");
+        if (content.includes("actions/labeler")) return true;
+      } catch {
+        // skip unreadable workflow
+      }
+    }
+  } catch {
+    // no workflows directory
+  }
+  return false;
+}
+
+export async function hasBranchRulesets(repoPath: string): Promise<boolean> {
+  const rulesetsDir = path.join(repoPath, ".github", "rulesets");
+  if (await fileExists(rulesetsDir)) {
+    try {
+      const entries = await fs.readdir(rulesetsDir);
+      if (entries.some((e) => e.endsWith(".json"))) return true;
+    } catch {
+      // skip unreadable directory
+    }
+  }
+  const rootFiles = await safeReadDir(repoPath);
+  if (
+    rootFiles.some(
+      (f) =>
+        f.toLowerCase() === "branch_protection.md" || f.toLowerCase() === "branch-protection.md"
+    )
+  )
+    return true;
+  return fileExists(path.join(repoPath, ".github", "branch-protection.json"));
+}
+
 export async function readAllDependencies(context: ReadinessContext): Promise<string[]> {
   const dependencies: string[] = [];
   const apps = context.apps.length ? context.apps : [];

@@ -33,6 +33,7 @@ const PILLAR_NAMES: Record<ReadinessPillar, string> = {
   "code-quality": "Code Quality",
   observability: "Observability",
   "security-governance": "Security & Governance",
+  "workflow-automation": "Workflow Automation",
   "ai-tooling": "AI Tooling"
 };
 

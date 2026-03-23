@@ -52,6 +52,7 @@ describe("runReadinessReport", () => {
     expect(pillarIds).toContain("observability");
     expect(pillarIds).toContain("security-governance");
     expect(pillarIds).toContain("ai-tooling");
+    expect(pillarIds).toContain("workflow-automation");
   });
 
   it("has 5 maturity levels", async () => {
@@ -400,6 +401,255 @@ describe("runReadinessReport", () => {
     });
   });
 
+  describe("workflow-automation pillar", () => {
+    describe("issue-templates", () => {
+      it("passes when .github/ISSUE_TEMPLATE/ directory with .yml files exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".github/ISSUE_TEMPLATE/feature.yml", "name: Feature");
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "issue-templates");
+
+        expect(criterion?.status).toBe("pass");
+      });
+
+      it("passes when .github/ISSUE_TEMPLATE/ directory with .md files exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".github/ISSUE_TEMPLATE/bug.md", "# Bug");
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "issue-templates");
+
+        expect(criterion?.status).toBe("pass");
+      });
+
+      it("passes when .github/ISSUE_TEMPLATE.md exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".github/ISSUE_TEMPLATE.md", "# Issue");
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "issue-templates");
+
+        expect(criterion?.status).toBe("pass");
+      });
+
+      it("fails when no issue template exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "issue-templates");
+
+        expect(criterion?.status).toBe("fail");
+      });
+    });
+
+    describe("pr-template (scored criterion)", () => {
+      it("passes when .github/PULL_REQUEST_TEMPLATE.md exists with linked-issue ref", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".github/PULL_REQUEST_TEMPLATE.md", "## Description\n\nCloses #");
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "pr-template");
+
+        expect(criterion?.status).toBe("pass");
+        expect(criterion?.reason).toBeUndefined();
+      });
+
+      it("passes with advisory reason when template lacks linked-issue reference", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".github/PULL_REQUEST_TEMPLATE.md", "## Description\n\n## Testing");
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "pr-template");
+
+        expect(criterion?.status).toBe("pass");
+        expect(criterion?.reason).toContain("linked-issue reference");
+      });
+
+      it("passes when template contains 'Fixes #'", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".github/PULL_REQUEST_TEMPLATE.md", "Fixes #\n## Testing");
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "pr-template");
+
+        expect(criterion?.status).toBe("pass");
+        expect(criterion?.reason).toBeUndefined();
+      });
+
+      it("fails when no PR template exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "pr-template");
+
+        expect(criterion?.status).toBe("fail");
+      });
+
+      it("is a scored criterion, not an extra", async () => {
+        await writePackageJson({ name: "test-repo" });
+
+        const report = await runReadinessReport({ repoPath });
+
+        expect(report.extras.find((e) => e.id === "pr-template")).toBeUndefined();
+        expect(report.criteria.find((c) => c.id === "pr-template")).toBeDefined();
+      });
+    });
+
+    describe("commit-convention", () => {
+      it("passes when commitlint.config.js exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(
+          "commitlint.config.js",
+          "export default { extends: ['@commitlint/config-conventional'] };"
+        );
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "commit-convention");
+
+        expect(criterion?.status).toBe("pass");
+      });
+
+      it("passes when .commitlintrc.json exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(
+          ".commitlintrc.json",
+          JSON.stringify({ extends: ["@commitlint/config-conventional"] })
+        );
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "commit-convention");
+
+        expect(criterion?.status).toBe("pass");
+      });
+
+      it("passes when @commitlint/* is in devDependencies", async () => {
+        await writePackageJson({
+          name: "test-repo",
+          devDependencies: { "@commitlint/config-conventional": "^19.0.0" }
+        });
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "commit-convention");
+
+        expect(criterion?.status).toBe("pass");
+      });
+
+      it("fails when no commit convention config exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "commit-convention");
+
+        expect(criterion?.status).toBe("fail");
+      });
+    });
+
+    describe("pr-labeling", () => {
+      it("passes when .github/labeler.yml exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".github/labeler.yml", "feature:\n  - src/**");
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "pr-labeling");
+
+        expect(criterion?.status).toBe("pass");
+      });
+
+      it("passes when a workflow references actions/labeler", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".github/workflows/labeler.yml", "steps:\n  - uses: actions/labeler@v5");
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "pr-labeling");
+
+        expect(criterion?.status).toBe("pass");
+      });
+
+      it("fails when no labeler is configured", async () => {
+        await writePackageJson({ name: "test-repo" });
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "pr-labeling");
+
+        expect(criterion?.status).toBe("fail");
+      });
+    });
+
+    describe("release-automation", () => {
+      it("passes when .releaserc.json exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".releaserc.json", JSON.stringify({ branches: ["main"] }));
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "release-automation");
+
+        expect(criterion?.status).toBe("pass");
+      });
+
+      it("passes when .changeset/config.json exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".changeset/config.json", JSON.stringify({ changelog: "@changesets/cli" }));
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "release-automation");
+
+        expect(criterion?.status).toBe("pass");
+      });
+
+      it("passes when a workflow contains semantic-release", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".github/workflows/release.yml", "steps:\n  - run: npx semantic-release");
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "release-automation");
+
+        expect(criterion?.status).toBe("pass");
+        expect(criterion?.evidence).toContain(".github/workflows/release.yml");
+      });
+
+      it("fails when no release automation exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "release-automation");
+
+        expect(criterion?.status).toBe("fail");
+      });
+    });
+
+    describe("branch-protection", () => {
+      it("passes when .github/rulesets/ contains a .json file", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".github/rulesets/main.json", JSON.stringify({ enforcement: "active" }));
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "branch-protection");
+
+        expect(criterion?.status).toBe("pass");
+      });
+
+      it("passes when .github/branch-protection.json exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(".github/branch-protection.json", JSON.stringify({ required_checks: [] }));
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "branch-protection");
+
+        expect(criterion?.status).toBe("pass");
+      });
+
+      it("fails when no branch protection config exists", async () => {
+        await writePackageJson({ name: "test-repo" });
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "branch-protection");
+
+        expect(criterion?.status).toBe("fail");
+      });
+    });
+  });
+
   describe("achieved level", () => {
     it("achieves level 1 with basic setup", async () => {
       await writePackageJson({
@@ -449,7 +699,7 @@ describe("runReadinessReport", () => {
 
       expect(report.extras.length).toBeGreaterThan(0);
       const extraIds = report.extras.map((e) => e.id);
-      expect(extraIds).toContain("pr-template");
+      expect(extraIds).not.toContain("pr-template"); // pr-template is now a scored criterion
       expect(extraIds).toContain("pre-commit");
       expect(extraIds).toContain("architecture-doc");
     });

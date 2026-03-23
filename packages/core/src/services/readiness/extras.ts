@@ -3,7 +3,7 @@ import path from "path";
 import { fileExists } from "../../utils/fs";
 import type { ExtraDefinition } from "../policy";
 
-import { hasPullRequestTemplate, hasPrecommitConfig, hasArchitectureDoc } from "./checkers";
+import { hasPrecommitConfig, hasArchitectureDoc } from "./checkers";
 import type { ReadinessContext, ReadinessExtraResult } from "./types";
 
 export function buildExtras(): ExtraDefinition[] {
@@ -16,17 +16,6 @@ export function buildExtras(): ExtraDefinition[] {
         return {
           status: found ? "pass" : "fail",
           reason: found ? undefined : "Missing AGENTS.md to guide coding agents."
-        };
-      }
-    },
-    {
-      id: "pr-template",
-      title: "Pull request template present",
-      check: async (context) => {
-        const found = await hasPullRequestTemplate(context.repoPath);
-        return {
-          status: found ? "pass" : "fail",
-          reason: found ? undefined : "Missing PR template for consistent reviews."
         };
       }
     },

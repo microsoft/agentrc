@@ -10,6 +10,7 @@ export type ReadinessPillar =
   | "code-quality"
   | "observability"
   | "security-governance"
+  | "workflow-automation"
   | "ai-tooling";
 
 export type PillarGroup = "repo-health" | "ai-setup";
@@ -23,6 +24,7 @@ export const PILLAR_GROUPS: Record<ReadinessPillar, PillarGroup> = {
   "code-quality": "repo-health",
   observability: "repo-health",
   "security-governance": "repo-health",
+  "workflow-automation": "repo-health",
   "ai-tooling": "ai-setup"
 };
 

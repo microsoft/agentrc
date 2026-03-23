@@ -97,7 +97,7 @@ describe("ReadinessReport shape baseline", () => {
     }
   });
 
-  it("locks the 9 pillar IDs", async () => {
+  it("locks the 10 pillar IDs", async () => {
     const report = await runReadinessReport({ repoPath });
     const pillarIds = report.pillars.map((p) => p.id).sort();
     expect(pillarIds).toEqual([
@@ -109,7 +109,8 @@ describe("ReadinessReport shape baseline", () => {
       "observability",
       "security-governance",
       "style-validation",
-      "testing"
+      "testing",
+      "workflow-automation"
     ]);
   });
 
@@ -175,9 +176,11 @@ describe("buildCriteria baseline", () => {
       "area-instructions",
       "area-readme",
       "area-test-script",
+      "branch-protection",
       "build-script",
       "ci-config",
       "codeowners",
+      "commit-convention",
       "contributing",
       "copilot-skills",
       "custom-agents",
@@ -186,12 +189,16 @@ describe("buildCriteria baseline", () => {
       "env-example",
       "format-config",
       "instructions-consistency",
+      "issue-templates",
       "license",
       "lint-config",
       "lockfile",
       "mcp-config",
       "observability",
+      "pr-labeling",
+      "pr-template",
       "readme",
+      "release-automation",
       "security-policy",
       "test-script",
       "typecheck-config"
@@ -211,6 +218,6 @@ describe("buildExtras baseline", () => {
   it("locks the set of built-in extra IDs", () => {
     const extras = buildExtras();
     const ids = extras.map((e) => e.id).sort();
-    expect(ids).toEqual(["agents-doc", "architecture-doc", "pr-template", "pre-commit"]);
+    expect(ids).toEqual(["agents-doc", "architecture-doc", "pre-commit"]);
   });
 });

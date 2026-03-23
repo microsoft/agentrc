@@ -50,6 +50,7 @@ export function summarizePillars(criteria: ReadinessCriterionResult[]): Readines
     "code-quality": "Code Quality",
     observability: "Observability",
     "security-governance": "Security & Governance",
+    "workflow-automation": "Workflow Automation",
     "ai-tooling": "AI Tooling"
   };
 

@@ -40,7 +40,7 @@ describe("engineReportToReadiness", () => {
     expect(result.isMonorepo).toBe(false);
     expect(result.apps).toEqual([]);
     expect(result.generatedAt).toBeDefined();
-    expect(result.pillars).toHaveLength(9);
+    expect(result.pillars).toHaveLength(10);
     expect(result.levels).toHaveLength(5);
     expect(result.criteria).toEqual([]);
     expect(result.extras).toEqual([]);
