@@ -208,6 +208,21 @@ agentrc tui
 | `--repo <path>`  | cwd     | Repository path      |
 | `--no-animation` |         | Skip animated banner |
 
+### TUI key bindings (idle state)
+
+| Key | Action                                                                 |
+| --- | ---------------------------------------------------------------------- |
+| `I` | Run `agentrc instructions`                                             |
+| `G` | Run `agentrc generate`                                                 |
+| `E` | Run `agentrc eval`                                                     |
+| `R` | Run `agentrc readiness`                                                |
+| `C` | Scaffold `agentrc.config.json` (shown only when no config file exists) |
+| `M` | Pick evaluation model                                                  |
+| `J` | Pick judge model                                                       |
+| `Q` | Quit                                                                   |
+
+The **Context** section of the TUI shows repo status at a glance, including detected areas, eval config presence, and whether `agentrc.config.json` exists.
+
 ## Next steps
 
 - [Concepts](concepts.md) — understand maturity model and readiness pillars

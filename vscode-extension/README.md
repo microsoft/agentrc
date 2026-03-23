@@ -67,14 +67,15 @@ Commit AgentRC-generated files and open a PR directly from VS Code. Supports bot
 
 ## Sidebar Views
 
-The **AgentRC** Activity Bar icon opens two tree views:
+The **AgentRC** Activity Bar icon opens three tree views:
 
-| View          | Contents                                                                                          |
-| ------------- | ------------------------------------------------------------------------------------------------- |
-| **Analysis**  | Languages, frameworks, monorepo areas — with action buttons for instructions and configs          |
-| **Readiness** | Maturity level, pillar groups (Repo Health / AI Setup), criteria pass/fail with evidence tooltips |
+| View                  | Contents                                                                                                                                                 |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Workspace Status**  | Config and Evals presence — green when found, yellow when missing. Click a missing item to scaffold it (`agentrc init` or `agentrc eval --init`). |
+| **Analysis**          | Languages, frameworks, monorepo areas — with action buttons for instructions and configs                                                                 |
+| **Readiness**         | Maturity level, pillar groups (Repo Health / AI Setup), criteria pass/fail with evidence tooltips                                                        |
 
-Both views show welcome screens with action buttons when no data is loaded yet.
+All views show welcome screens with action buttons when no data is loaded yet.
 
 ## Settings
 

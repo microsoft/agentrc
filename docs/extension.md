@@ -32,12 +32,13 @@ Open the Command Palette (`⇧⌘P`) and type `AgentRC`:
 
 ## Sidebar views
 
-The AgentRC activity bar icon gives you two tree views:
+The AgentRC activity bar icon gives you three tree views:
 
+- **Workspace Status** — Quick-glance Config and Evals status. Items are color-coded (green = found, yellow = missing) and clickable: missing Config triggers **Init Repository**, missing Evals triggers **Scaffold Eval Config**. Refreshes after `init` and eval scaffold commands.
 - **Analysis** — Repo structure at a glance: languages, frameworks, detected areas
 - **Readiness** — Pillar-by-pillar readiness breakdown with pass/fail indicators
 
-Both views refresh automatically when you run commands.
+All views refresh automatically when you run commands.
 
 ## Settings
 

@@ -9,10 +9,18 @@ All notable changes to this project will be documented in this file.
 - **`--dry-run` for generate** — preview which files would be created or skipped without writing anything (`agentrc generate mcp --dry-run`)
 - **JSONC support** — `agentrc.config.json`, `agentrc.eval.json`, and policy files now accept `//` and `/* */` comments
 - **Array eval expectations** — `expectation` field in eval configs accepts `string[]` for structured criteria
+- **Config status in TUI** — the interactive TUI now shows whether `agentrc.config.json` is present, with a `[C]` keybinding to scaffold it when missing (#74)
+- **Workspace Status view in VS Code** — a new **Workspace Status** tree view in the AgentRC sidebar surfaces Config and Evals presence, with clickable items that trigger `agentrc init` or `agentrc eval --init` respectively (#74)
 
 ### Bug Fixes
 
-- **Config scaffolding for simple repos** — `agentrc init` and the TUI now create `agentrc.config.json` even when no areas are detected, producing a minimal `{}` stub. Previously failed with "No areas detected. Cannot scaffold agentrc.config.json."
+- **Config scaffolding for simple repos** — `agentrc init` and the TUI now create `agentrc.config.json` even when no areas are detected, producing a minimal `{}` stub. Previously failed with "No areas detected. Cannot scaffold agentrc.config.json." (#79)
+- **TUI model/eval picker blank on discovery failure** — the model picker now falls back to a preferred model list when CLI model discovery fails or returns empty, so the picker always renders (#78)
+- **TUI screen artifacts on resize** — resizing the terminal while the TUI is open no longer produces stacked ghost renders of the banner (#76)
+
+### Dependencies
+
+- Bump `@github/copilot-sdk` from 0.1.32 to 0.2.0 (#73)
 
 ## [2.1.0]
 
