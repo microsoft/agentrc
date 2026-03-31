@@ -302,7 +302,10 @@ export function buildCriteria(): ReadinessCriterion[] {
         }
 
         // Check for area instructions (.github/instructions/*.instructions.md)
-        const fileBasedInstructions = await hasFileBasedInstructions(context.repoPath);
+        const fileBasedInstructions = await hasFileBasedInstructions(
+          context.repoPath,
+          context.vscodeLocations?.instructionsLocations
+        );
         const areas = context.analysis.areas ?? [];
 
         // For monorepos or repos with detected areas, check coverage
@@ -317,6 +320,15 @@ export function buildCriteria(): ReadinessCriterion[] {
           return {
             status: "pass",
             reason: `Root + ${fileBasedInstructions.length} area instruction(s) found.`,
+            evidence: [...rootFound, ...fileBasedInstructions]
+          };
+        }
+
+        // File-based instructions found (e.g. from VS Code location settings) without areas
+        if (fileBasedInstructions.length > 0) {
+          return {
+            status: "pass",
+            reason: `Root + ${fileBasedInstructions.length} file-based instruction(s) found.`,
             evidence: [...rootFound, ...fileBasedInstructions]
           };
         }
@@ -405,7 +417,10 @@ export function buildCriteria(): ReadinessCriterion[] {
       impact: "medium",
       effort: "medium",
       check: async (context) => {
-        const found = await hasCustomAgents(context.repoPath);
+        const found = await hasCustomAgents(
+          context.repoPath,
+          context.vscodeLocations?.agentLocations
+        );
         return {
           status: found.length > 0 ? "pass" : "fail",
           reason: "No custom AI agents configured (e.g. .github/agents/, .copilot/agents/).",
@@ -425,7 +440,10 @@ export function buildCriteria(): ReadinessCriterion[] {
       impact: "medium",
       effort: "medium",
       check: async (context) => {
-        const found = await hasCopilotSkills(context.repoPath);
+        const found = await hasCopilotSkills(
+          context.repoPath,
+          context.vscodeLocations?.skillsLocations
+        );
         return {
           status: found.length > 0 ? "pass" : "fail",
           reason: "No Copilot or Claude skills found (e.g. .copilot/skills/, .github/skills/).",

@@ -3,7 +3,11 @@ import path from "path";
 
 import { fileExists, safeReadDir, readJson } from "../../utils/fs";
 
-import type { InstructionConsistencyResult, ReadinessContext } from "./types";
+import type {
+  InstructionConsistencyResult,
+  ReadinessContext,
+  VscodeLocationSettings
+} from "./types";
 
 export function hasAnyFile(files: string[], candidates: string[]): boolean {
   return candidates.some((candidate) => files.includes(candidate));
@@ -98,6 +102,111 @@ export async function hasArchitectureDoc(repoPath: string): Promise<boolean> {
   return fileExists(path.join(repoPath, "docs", "architecture.md"));
 }
 
+function validateAndNormalize(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed || path.isAbsolute(trimmed)) return undefined;
+  const segments = trimmed.split(/[/\\]+/u);
+  if (segments.some((s) => s === "..")) return undefined;
+  let normalized = path.normalize(trimmed).replace(/\\/gu, "/");
+  normalized = normalized.replace(/\/+$/u, "");
+  if (!normalized || normalized === ".") return undefined;
+  return normalized;
+}
+
+function extractLocationPaths(entries: unknown): string[] {
+  if (!entries || typeof entries !== "object") return [];
+  const paths: string[] = [];
+
+  // Array format: [{ path: "dir" }, "dir2"]
+  if (Array.isArray(entries)) {
+    for (const entry of entries) {
+      let raw: string | undefined;
+      if (typeof entry === "string") {
+        raw = entry;
+      } else if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+        const obj = entry as Record<string, unknown>;
+        if (typeof obj.path === "string") {
+          raw = obj.path;
+        }
+      }
+      if (raw) {
+        const normalized = validateAndNormalize(raw);
+        if (normalized) paths.push(normalized);
+      }
+    }
+    return paths;
+  }
+
+  // Object/map format: { "dir": true, "dir2": false }
+  for (const [key, value] of Object.entries(entries as Record<string, unknown>)) {
+    if (value !== true) continue;
+    const normalized = validateAndNormalize(key);
+    if (normalized) paths.push(normalized);
+  }
+  return paths;
+}
+
+function extractLocationsFromSettings(settings: Record<string, unknown>): VscodeLocationSettings {
+  return {
+    instructionsLocations: extractLocationPaths(settings["chat.instructionsFilesLocations"]),
+    agentLocations: extractLocationPaths(settings["chat.agentFilesLocations"]),
+    skillsLocations: extractLocationPaths(settings["chat.agentSkillsLocations"])
+  };
+}
+
+function mergeLocations(
+  a: VscodeLocationSettings,
+  b: VscodeLocationSettings
+): VscodeLocationSettings {
+  return {
+    instructionsLocations: [...a.instructionsLocations, ...b.instructionsLocations],
+    agentLocations: [...a.agentLocations, ...b.agentLocations],
+    skillsLocations: [...a.skillsLocations, ...b.skillsLocations]
+  };
+}
+
+/**
+ * Read `chat.instructionsFilesLocations`, `chat.agentFilesLocations`, and
+ * `chat.agentSkillsLocations` from `.vscode/settings.json` and `*.code-workspace`
+ * files in the repo root. Paths are validated to be relative and free of traversal.
+ */
+export async function parseVscodeLocations(
+  repoPath: string,
+  rootFiles: string[]
+): Promise<VscodeLocationSettings> {
+  const empty: VscodeLocationSettings = {
+    instructionsLocations: [],
+    agentLocations: [],
+    skillsLocations: []
+  };
+  let result = { ...empty };
+
+  // Read from .vscode/settings.json (JSONC — may contain comments)
+  const settings = await readJson(path.join(repoPath, ".vscode", "settings.json"));
+  if (settings) {
+    result = mergeLocations(result, extractLocationsFromSettings(settings));
+  }
+
+  // Read from *.code-workspace files in the repo root (JSONC format)
+  const workspaceFiles = rootFiles.filter((f) => f.endsWith(".code-workspace"));
+  for (const wsFile of workspaceFiles) {
+    const ws = await readJson(path.join(repoPath, wsFile));
+    if (ws?.settings && typeof ws.settings === "object" && !Array.isArray(ws.settings)) {
+      result = mergeLocations(
+        result,
+        extractLocationsFromSettings(ws.settings as Record<string, unknown>)
+      );
+    }
+  }
+
+  // Deduplicate
+  return {
+    instructionsLocations: [...new Set(result.instructionsLocations)],
+    agentLocations: [...new Set(result.agentLocations)],
+    skillsLocations: [...new Set(result.skillsLocations)]
+  };
+}
+
 export async function hasCustomInstructions(repoPath: string): Promise<string[]> {
   const found: string[] = [];
   const candidates = [
@@ -120,16 +229,35 @@ export async function hasCustomInstructions(repoPath: string): Promise<string[]>
   return found;
 }
 
-export async function hasFileBasedInstructions(repoPath: string): Promise<string[]> {
-  const instructionsDir = path.join(repoPath, ".github", "instructions");
+export async function hasFileBasedInstructions(
+  repoPath: string,
+  extraDirs?: string[]
+): Promise<string[]> {
+  const found: string[] = [];
+  const defaultDir = path.join(repoPath, ".github", "instructions");
   try {
-    const entries = await fs.readdir(instructionsDir);
-    return entries
-      .filter((e) => e.endsWith(".instructions.md"))
-      .map((e) => `.github/instructions/${e}`);
+    const entries = await fs.readdir(defaultDir);
+    found.push(
+      ...entries
+        .filter((e) => e.endsWith(".instructions.md"))
+        .map((e) => `.github/instructions/${e}`)
+    );
   } catch {
-    return [];
+    // directory doesn't exist or not readable
   }
+  for (const dir of extraDirs ?? []) {
+    const fullDir = path.join(repoPath, dir);
+    const normalizedDir = dir.replace(/\\/gu, "/").replace(/\/+$/u, "");
+    try {
+      const entries = await fs.readdir(fullDir);
+      found.push(
+        ...entries.filter((e) => e.endsWith(".instructions.md")).map((e) => `${normalizedDir}/${e}`)
+      );
+    } catch {
+      // directory doesn't exist or not readable
+    }
+  }
+  return [...new Set(found)];
 }
 
 /**
@@ -237,7 +365,7 @@ export async function hasMcpConfig(repoPath: string): Promise<string[]> {
   return found;
 }
 
-export async function hasCustomAgents(repoPath: string): Promise<string[]> {
+export async function hasCustomAgents(repoPath: string, extraDirs?: string[]): Promise<string[]> {
   const found: string[] = [];
   const agentDirs = [".github/agents", ".copilot/agents", ".github/copilot/agents"];
   for (const dir of agentDirs) {
@@ -252,10 +380,15 @@ export async function hasCustomAgents(repoPath: string): Promise<string[]> {
       found.push(agentFile);
     }
   }
-  return found;
+  for (const dir of extraDirs ?? []) {
+    if (await fileExists(path.join(repoPath, dir))) {
+      found.push(dir);
+    }
+  }
+  return [...new Set(found)];
 }
 
-export async function hasCopilotSkills(repoPath: string): Promise<string[]> {
+export async function hasCopilotSkills(repoPath: string, extraDirs?: string[]): Promise<string[]> {
   const found: string[] = [];
   const skillDirs = [
     ".copilot/skills",
@@ -268,7 +401,12 @@ export async function hasCopilotSkills(repoPath: string): Promise<string[]> {
       found.push(dir);
     }
   }
-  return found;
+  for (const dir of extraDirs ?? []) {
+    if (await fileExists(path.join(repoPath, dir))) {
+      found.push(dir);
+    }
+  }
+  return [...new Set(found)];
 }
 
 export async function readAllDependencies(context: ReadinessContext): Promise<string[]> {

@@ -413,6 +413,22 @@ describe("stripJsonComments", () => {
     const input = '{"a": 1} // trailing';
     expect(stripJsonComments(input)).toBe('{"a": 1} ');
   });
+
+  it("strips trailing commas before } and ]", () => {
+    expect(JSON.parse(stripJsonComments('{"a": 1,}'))).toEqual({ a: 1 });
+    expect(JSON.parse(stripJsonComments("[1, 2,]"))).toEqual([1, 2]);
+    expect(JSON.parse(stripJsonComments('{"a": [1,],}'))).toEqual({ a: [1] });
+  });
+
+  it("strips trailing commas with comments between", () => {
+    const input = '{\n  "a": 1, // note\n}';
+    expect(JSON.parse(stripJsonComments(input))).toEqual({ a: 1 });
+  });
+
+  it("preserves commas inside string literals", () => {
+    const input = '{"msg": "items: a,}"}';
+    expect(JSON.parse(stripJsonComments(input))).toEqual({ msg: "items: a,}" });
+  });
 });
 
 describe("readJson with JSONC", () => {

@@ -105,12 +105,23 @@ export type ReadinessReport = {
   };
 };
 
+/**
+ * Parsed VS Code workspace location settings for AI-related file discovery.
+ * Extracted from `.vscode/settings.json` and `*.code-workspace` files.
+ */
+export type VscodeLocationSettings = {
+  instructionsLocations: string[];
+  agentLocations: string[];
+  skillsLocations: string[];
+};
+
 export type ReadinessContext = {
   repoPath: string;
   analysis: RepoAnalysis;
   apps: RepoApp[];
   rootFiles: string[];
   rootPackageJson?: Record<string, unknown>;
+  vscodeLocations?: VscodeLocationSettings;
   areaPath?: string;
   areaFiles?: string[];
 };

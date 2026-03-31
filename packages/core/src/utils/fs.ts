@@ -322,9 +322,9 @@ export async function safeReadDir(dirPath: string): Promise<string[]> {
 }
 
 /**
- * Strip single-line (`//`) and multi-line (`/* … *\/`) comments from a JSON
- * string so it can be parsed as JSONC. Handles comments inside string literals
- * correctly by skipping quoted regions.
+ * Strip single-line (`//`) and multi-line (`/* … *\/`) comments and trailing
+ * commas from a JSON string (JSONC). Handles these correctly inside string
+ * literals by skipping quoted regions.
  */
 export function stripJsonComments(text: string): string {
   let result = "";
@@ -360,6 +360,29 @@ export function stripJsonComments(text: string): string {
       while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
       if (i < text.length) i += 2; // skip closing */
       continue;
+    }
+    // Trailing comma — skip comma when only whitespace/comments separate it from } or ]
+    if (text[i] === ",") {
+      let j = i + 1;
+      // Skip whitespace and comments to find next meaningful char
+      while (j < text.length) {
+        if (text[j] === " " || text[j] === "\t" || text[j] === "\n" || text[j] === "\r") {
+          j++;
+        } else if (text[j] === "/" && text[j + 1] === "/") {
+          j += 2;
+          while (j < text.length && text[j] !== "\n") j++;
+        } else if (text[j] === "/" && text[j + 1] === "*") {
+          j += 2;
+          while (j < text.length && !(text[j] === "*" && text[j + 1] === "/")) j++;
+          if (j < text.length) j += 2;
+        } else {
+          break;
+        }
+      }
+      if (j < text.length && (text[j] === "}" || text[j] === "]")) {
+        i++;
+        continue;
+      }
     }
     result += text[i];
     i++;

@@ -8,6 +8,7 @@ import { executePlugins } from "../policy/engine";
 import { loadPluginChain } from "../policy/loader";
 import type { PolicyContext } from "../policy/types";
 
+import { parseVscodeLocations } from "./checkers";
 import { buildCriteria } from "./criteria";
 import { buildExtras, runExtras } from "./extras";
 import { summarizePillars, summarizeLevels } from "./scoring";
@@ -35,7 +36,8 @@ export type {
   ReadinessContext,
   ReadinessCriterion,
   CheckResult,
-  InstructionConsistencyResult
+  InstructionConsistencyResult,
+  VscodeLocationSettings
 } from "./types";
 export { PILLAR_GROUPS, PILLAR_GROUP_NAMES } from "./types";
 export { groupPillars, getLevelName, getLevelDescription } from "./scoring";
@@ -57,13 +59,15 @@ export async function runReadinessReport(options: ReadinessOptions): Promise<Rea
   const rootFiles = await safeReadDir(repoPath);
   const rootPackageJson = await readJson(path.join(repoPath, "package.json"));
   const apps = analysis.apps?.length ? analysis.apps : [];
+  const vscodeLocations = await parseVscodeLocations(repoPath, rootFiles);
 
   const context: ReadinessContext = {
     repoPath,
     analysis,
     apps,
     rootFiles,
-    rootPackageJson
+    rootPackageJson,
+    vscodeLocations
   };
 
   // ── Policy resolution ──
