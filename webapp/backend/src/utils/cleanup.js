@@ -11,11 +11,7 @@ export async function createTempDir() {
 
 /** Remove a temp directory, ignoring ENOENT. */
 export async function removeTempDir(dirPath) {
-  try {
-    await rm(dirPath, { recursive: true, force: true });
-  } catch (err) {
-    if (err.code !== "ENOENT") throw err;
-  }
+  await rm(dirPath, { recursive: true, force: true });
 }
 
 /**

@@ -24,9 +24,8 @@ COPY --from=deps /app/node_modules /app/node_modules
 COPY --from=build /app/webapp/backend/dist ./dist
 COPY webapp/frontend/ /app/frontend/
 ENV REPORTS_DIR=/app/data/reports
-RUN apk upgrade --no-cache \
-  && mkdir -p /app/data /tmp/agentrc-scans \
-  && chown -R node:node /app /tmp/agentrc-scans
+RUN mkdir -p /app/data \
+  && chown -R node:node /app
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
