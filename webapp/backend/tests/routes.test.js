@@ -11,8 +11,15 @@ vi.mock("@agentrc/core/services/readiness", () => ({
     generatedAt: "2025-01-15T12:00:00.000Z",
     isMonorepo: false,
     apps: [],
-    pillars: [{ name: "Documentation", passed: 2, failed: 1 }],
-    levels: [{ level: 1, description: "Foundation" }],
+    pillars: [
+      { id: "documentation", name: "Documentation", passed: 2, total: 3, passRate: 0.67 },
+      { id: "testing", name: "Testing", passed: 1, total: 2, passRate: 0.5 }
+    ],
+    levels: [
+      { level: 1, name: "Functional", passed: 3, total: 4, passRate: 0.75, achieved: true },
+      { level: 2, name: "Documented", passed: 2, total: 3, passRate: 0.67, achieved: true },
+      { level: 3, name: "Standardized", passed: 0, total: 2, passRate: 0, achieved: false }
+    ],
     achievedLevel: 2,
     criteria: [],
     extras: []
@@ -130,8 +137,15 @@ describe("API routes", () => {
       generatedAt: "2025-01-15T12:00:00.000Z",
       isMonorepo: false,
       apps: [],
-      pillars: [{ name: "Documentation", passed: 2, failed: 1 }],
-      levels: [{ level: 1, description: "Foundation" }],
+      pillars: [
+        { id: "documentation", name: "Documentation", passed: 2, total: 3, passRate: 0.67 },
+        { id: "testing", name: "Testing", passed: 1, total: 2, passRate: 0.5 }
+      ],
+      levels: [
+        { level: 1, name: "Functional", passed: 3, total: 4, passRate: 0.75, achieved: true },
+        { level: 2, name: "Documented", passed: 2, total: 3, passRate: 0.67, achieved: true },
+        { level: 3, name: "Standardized", passed: 0, total: 2, passRate: 0, achieved: false }
+      ],
       achievedLevel: 2,
       criteria: [],
       extras: []

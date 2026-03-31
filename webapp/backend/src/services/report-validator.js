@@ -131,8 +131,45 @@ export function normalizeSharedReportResult(value) {
     }
   }
 
-  if (areaReports) normalized.areaReports = areaReports;
-  if (policies) normalized.policies = policies;
+  // Validate areaReports: must be an array of objects with { area, criteria[], pillars[] }
+  if (areaReports != null) {
+    if (!Array.isArray(areaReports) || areaReports.length > 50) {
+      throw new ReportValidationError("areaReports must be an array with at most 50 entries.");
+    }
+    for (const ar of areaReports) {
+      if (!ar || typeof ar !== "object" || Array.isArray(ar)) {
+        throw new ReportValidationError("Each areaReport must be a non-null object.");
+      }
+      if (!ar.area || typeof ar.area !== "object" || Array.isArray(ar.area)) {
+        throw new ReportValidationError("Each areaReport must have an area object.");
+      }
+      if (!Array.isArray(ar.criteria)) {
+        throw new ReportValidationError("Each areaReport must have a criteria array.");
+      }
+      if (!Array.isArray(ar.pillars)) {
+        throw new ReportValidationError("Each areaReport must have a pillars array.");
+      }
+    }
+    normalized.areaReports = areaReports;
+  }
+
+  // Validate policies: must be { chain: string[], criteriaCount: number }
+  if (policies != null) {
+    if (!policies || typeof policies !== "object" || Array.isArray(policies)) {
+      throw new ReportValidationError("policies must be a non-null object.");
+    }
+    if (!Array.isArray(policies.chain) || !policies.chain.every((c) => typeof c === "string")) {
+      throw new ReportValidationError("policies.chain must be an array of strings.");
+    }
+    if (
+      typeof policies.criteriaCount !== "number" ||
+      !Number.isInteger(policies.criteriaCount) ||
+      policies.criteriaCount < 0
+    ) {
+      throw new ReportValidationError("policies.criteriaCount must be a non-negative integer.");
+    }
+    normalized.policies = { chain: policies.chain, criteriaCount: policies.criteriaCount };
+  }
   if (repo_url) {
     const urlStr = String(repo_url).slice(0, 500);
     if (GITHUB_URL_RE.test(urlStr)) normalized.repo_url = urlStr;

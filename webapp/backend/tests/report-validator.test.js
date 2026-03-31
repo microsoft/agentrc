@@ -132,4 +132,139 @@ describe("normalizeSharedReportResult", () => {
     });
     expect(result.repo_url).toBeUndefined();
   });
+
+  // --- areaReports validation ---
+  it("accepts valid areaReports", () => {
+    const result = normalizeSharedReportResult({
+      ...validReport,
+      areaReports: [
+        {
+          area: { name: "packages/core", path: "packages/core" },
+          criteria: [{ id: "readme", status: "pass" }],
+          pillars: [{ name: "Documentation", passed: 1, failed: 0 }]
+        }
+      ]
+    });
+    expect(result.areaReports).toHaveLength(1);
+  });
+
+  it("omits areaReports when not provided", () => {
+    const result = normalizeSharedReportResult(validReport);
+    expect(result.areaReports).toBeUndefined();
+  });
+
+  it("rejects non-array areaReports", () => {
+    expect(() =>
+      normalizeSharedReportResult({ ...validReport, areaReports: "bad" })
+    ).toThrow(/areaReports must be an array/);
+  });
+
+  it("rejects areaReports with non-object entries", () => {
+    expect(() =>
+      normalizeSharedReportResult({ ...validReport, areaReports: [null] })
+    ).toThrow(/Each areaReport must be a non-null object/);
+  });
+
+  it("rejects areaReport missing area object", () => {
+    expect(() =>
+      normalizeSharedReportResult({
+        ...validReport,
+        areaReports: [{ area: "not-an-object", criteria: [], pillars: [] }]
+      })
+    ).toThrow(/must have an area object/);
+  });
+
+  it("rejects areaReport with non-array criteria", () => {
+    expect(() =>
+      normalizeSharedReportResult({
+        ...validReport,
+        areaReports: [{ area: { name: "x" }, criteria: "bad", pillars: [] }]
+      })
+    ).toThrow(/must have a criteria array/);
+  });
+
+  it("rejects areaReport with non-array pillars", () => {
+    expect(() =>
+      normalizeSharedReportResult({
+        ...validReport,
+        areaReports: [{ area: { name: "x" }, criteria: [], pillars: {} }]
+      })
+    ).toThrow(/must have a pillars array/);
+  });
+
+  it("rejects areaReports exceeding 50 entries", () => {
+    const big = Array.from({ length: 51 }, (_, i) => ({
+      area: { name: `area-${i}` },
+      criteria: [],
+      pillars: []
+    }));
+    expect(() =>
+      normalizeSharedReportResult({ ...validReport, areaReports: big })
+    ).toThrow(/at most 50/);
+  });
+
+  // --- policies validation ---
+  it("accepts valid policies", () => {
+    const result = normalizeSharedReportResult({
+      ...validReport,
+      policies: { chain: ["builtin", "custom"], criteriaCount: 30 }
+    });
+    expect(result.policies.chain).toEqual(["builtin", "custom"]);
+    expect(result.policies.criteriaCount).toBe(30);
+  });
+
+  it("omits policies when not provided", () => {
+    const result = normalizeSharedReportResult(validReport);
+    expect(result.policies).toBeUndefined();
+  });
+
+  it("rejects non-object policies", () => {
+    expect(() =>
+      normalizeSharedReportResult({ ...validReport, policies: "bad" })
+    ).toThrow(/policies must be a non-null object/);
+  });
+
+  it("rejects policies with non-array chain", () => {
+    expect(() =>
+      normalizeSharedReportResult({
+        ...validReport,
+        policies: { chain: "builtin", criteriaCount: 10 }
+      })
+    ).toThrow(/policies\.chain must be an array of strings/);
+  });
+
+  it("rejects policies with non-string chain entries", () => {
+    expect(() =>
+      normalizeSharedReportResult({
+        ...validReport,
+        policies: { chain: [42], criteriaCount: 10 }
+      })
+    ).toThrow(/policies\.chain must be an array of strings/);
+  });
+
+  it("rejects policies with non-integer criteriaCount", () => {
+    expect(() =>
+      normalizeSharedReportResult({
+        ...validReport,
+        policies: { chain: ["builtin"], criteriaCount: 2.5 }
+      })
+    ).toThrow(/policies\.criteriaCount must be a non-negative integer/);
+  });
+
+  it("rejects policies with negative criteriaCount", () => {
+    expect(() =>
+      normalizeSharedReportResult({
+        ...validReport,
+        policies: { chain: ["builtin"], criteriaCount: -1 }
+      })
+    ).toThrow(/policies\.criteriaCount must be a non-negative integer/);
+  });
+
+  it("strips extra fields from policies", () => {
+    const result = normalizeSharedReportResult({
+      ...validReport,
+      policies: { chain: ["builtin"], criteriaCount: 10, extra: "injected" }
+    });
+    expect(result.policies).toEqual({ chain: ["builtin"], criteriaCount: 10 });
+  });
 });
