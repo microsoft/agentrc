@@ -100,13 +100,17 @@ jobs:
             --location eastus \
             --tags application=agentrc-webapp managedBy=bicep
 
-      - name: Remove existing env storage (Azure Container Apps PUT limitation)
+      - name: Pre-deploy cleanup (Container Apps storage update limitation)
         run: |
+          az containerapp delete \
+            --name agentrc-webapp \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --yes 2>&1 || echo "Container app does not exist yet"
           SUB_ID=$(az account show --query id -o tsv)
           az rest --method DELETE \
             --url "https://management.azure.com/subscriptions/${SUB_ID}/resourceGroups/${{ env.RESOURCE_GROUP }}/providers/Microsoft.App/managedEnvironments/agentrc-env/storages/reportsshare?api-version=2024-03-01" \
-            2>&1 || echo "Storage does not exist or removal skipped"
-          sleep 15
+            2>&1 || echo "Storage mount does not exist yet"
+          sleep 10
 
       - name: Deploy infrastructure
         uses: azure/arm-deploy@v2
