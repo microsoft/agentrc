@@ -1,4 +1,4 @@
-import { mkdtemp, rm, readdir, stat } from "node:fs/promises";
+import { mkdtemp, rm, readdir, lstat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -36,8 +36,8 @@ export async function sweepStaleTempDirs({ maxAgeMs = 10 * 60 * 1000, prefix = P
     if (!entry.startsWith(prefix)) continue;
     const fullPath = join(base, entry);
     try {
-      const info = await stat(fullPath);
-      if (info.isDirectory() && now - info.mtimeMs > maxAgeMs) {
+      const info = await lstat(fullPath);
+      if (info.isDirectory() && !info.isSymbolicLink() && now - info.mtimeMs > maxAgeMs) {
         await rm(fullPath, { recursive: true, force: true });
         cleaned++;
       }

@@ -93,7 +93,7 @@ export function createApp(runtime) {
   // SPA catch-all: serve index.html for non-API routes
   app.get(/^\/(?!api\/).*/, (_req, res, next) => {
     res.sendFile("index.html", { root: runtime.frontendPath }, (err) => {
-      if (err) next();
+      if (err) next(err);
     });
   });
 

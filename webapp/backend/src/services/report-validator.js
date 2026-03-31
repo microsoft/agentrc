@@ -96,11 +96,19 @@ export function normalizeSharedReportResult(value) {
     if (!c || typeof c !== "object" || Array.isArray(c)) {
       throw new ReportValidationError("Each criteria item must be a non-null object.");
     }
-    if (c.title && c.title.length > MAX_STRING_LEN) {
-      throw new ReportValidationError("Criteria title too long.");
+    if (c.title !== undefined) {
+      if (typeof c.title !== "string") {
+        delete c.title;
+      } else if (c.title.length > MAX_STRING_LEN) {
+        throw new ReportValidationError("Criteria title too long.");
+      }
     }
-    if (c.reason && c.reason.length > MAX_STRING_LEN) {
-      throw new ReportValidationError("Criteria reason too long.");
+    if (c.reason !== undefined) {
+      if (typeof c.reason !== "string") {
+        delete c.reason;
+      } else if (c.reason.length > MAX_STRING_LEN) {
+        throw new ReportValidationError("Criteria reason too long.");
+      }
     }
     if (c.status !== undefined && !ALLOWED_STATUS.has(c.status)) {
       delete c.status;

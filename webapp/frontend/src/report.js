@@ -246,22 +246,19 @@ function buildPillarPerformance(report) {
 
     inner += `<h3 class="group-label">${esc(label)}</h3><div class="pillar-grid">`;
     for (const p of pillars) {
-      const allPass = p.passed === p.total;
-      const pct = p.total > 0 ? Math.max((p.passed / p.total) * 100, 2) : 0;
-      const cls =
-        p.total > 0
-          ? p.passed / p.total >= 0.8
-            ? "high"
-            : p.passed / p.total >= 0.5
-              ? "medium"
-              : "low"
-          : "low";
+      const passed = Number.isFinite(p.passed) ? p.passed : 0;
+      const total = Number.isFinite(p.total) ? p.total : 0;
+      const allPass = passed === total && total > 0;
+      const rawPct = total > 0 ? (passed / total) * 100 : 0;
+      const pct = Math.max(Math.min(rawPct, 100), total > 0 ? 2 : 0);
+      const ratio = total > 0 ? passed / total : 0;
+      const cls = ratio >= 0.8 ? "high" : ratio >= 0.5 ? "medium" : "low";
       inner += `
         <div class="pillar-card${allPass ? " all-passing" : " has-failures"}">
           <div class="pillar-name">${esc(p.name)}</div>
           <div class="pillar-stats">
             <div class="progress-bar"><div class="progress-fill ${cls}" style="width:${pct.toFixed(0)}%"></div></div>
-            <span>${allPass ? "All passing" : `${p.passed} of ${p.total}`}</span>
+            <span>${allPass ? "All passing" : `${passed} of ${total}`}</span>
           </div>
         </div>`;
     }

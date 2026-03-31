@@ -14,7 +14,7 @@ const OWNER_RE = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
 const REPO_RE = /^[a-zA-Z0-9._-]{1,100}$/;
 
 /**
- * Parse a GitHub repo reference into { owner, repo, branch?, url }.
+ * Parse a GitHub repo reference into { owner, repo, url }.
  * Accepts: "owner/repo", "https://github.com/owner/repo", "https://github.com/owner/repo.git"
  * Rejects non-GitHub URLs (SSRF protection).
  */
