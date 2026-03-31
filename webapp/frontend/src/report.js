@@ -94,7 +94,7 @@ export function renderReport(report, { sharingEnabled = false, shared = false } 
 // =====================================================================
 
 function buildHero(report) {
-  const level = report.achievedLevel || 1;
+  const level = report.achievedLevel ?? 1;
   const name = LEVEL_NAMES[level] || `Level ${level}`;
   const levelClass = level >= 4 ? "level-high" : level >= 2 ? "level-mid" : "level-low";
 
@@ -274,7 +274,7 @@ function buildPillarPerformance(report) {
 // =====================================================================
 
 function buildMaturityModel(report) {
-  const level = report.achievedLevel || 1;
+  const level = report.achievedLevel ?? 1;
 
   const el = createElement("div", "section");
   el.innerHTML = `
@@ -354,7 +354,7 @@ function buildPillarDetails(report) {
       inner += `
         <div class="criterion-row">
           <span class="criterion-row-title">${esc(e.title || e.id)}</span>
-          <span class="criterion-status ${e.status}">${e.status === "pass" ? "Pass" : e.status === "fail" ? "Fail" : "Skip"}</span>
+          <span class="criterion-status ${safeClass(e.status, ALLOWED_STATUS)}">${e.status === "pass" ? "Pass" : e.status === "fail" ? "Fail" : "Skip"}</span>
         </div>`;
     }
     inner += `</div>`;

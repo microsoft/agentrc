@@ -11,22 +11,14 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="theme-color" content="#0d1117" />
   <link rel="stylesheet" href="/src/main.css" />
-  <script>
-    // Inline theme init — respect saved preference, default dark
-    (function() {
-      var saved = localStorage.getItem('theme') || 'dark';
-      document.documentElement.setAttribute('data-theme', saved);
-      document.querySelector('meta[name="theme-color"]').content =
-        saved === 'light' ? '#ffffff' : '#0d1117';
-    })();
-  </script>
+  <script src="/src/theme-init.js"></script>
 </head>
 <body>
   <header class="topbar">
     <div class="topbar-inner">
       <a href="/" class="logo">
-        <span class="logo-icon">⚡</span>
-        <span class="logo-text">AgentRC</span>
+        <span class="logo-icon">⛶</span>
+        <span class="logo-text">AgentRC | Context engineering for AI coding agents</span>
       </a>
       <nav class="topbar-nav">
         <a href="https://github.com/microsoft/agentrc" target="_blank" rel="noopener">GitHub</a>

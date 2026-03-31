@@ -176,7 +176,7 @@ function setFormBusy(busy) {
   btn.disabled = busy;
   input.disabled = busy;
   label.textContent = busy ? "Scanning…" : "Scan";
-  spinner.style.display = busy ? "inline-block" : "none";
+  spinner.hidden = !busy;
 }
 
 // ===== Theme Toggle =====

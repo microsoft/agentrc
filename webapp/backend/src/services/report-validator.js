@@ -93,6 +93,9 @@ export function normalizeSharedReportResult(value) {
 
   // Validate string lengths and enum fields to prevent abuse
   for (const c of criteria) {
+    if (!c || typeof c !== "object" || Array.isArray(c)) {
+      throw new ReportValidationError("Each criteria item must be a non-null object.");
+    }
     if (c.title && c.title.length > MAX_STRING_LEN) {
       throw new ReportValidationError("Criteria title too long.");
     }
@@ -118,8 +121,15 @@ export function normalizeSharedReportResult(value) {
     levels,
     achievedLevel,
     criteria,
-    extras: Array.isArray(extras) ? extras : []
+    extras: Array.isArray(extras) ? extras.filter((e) => e && typeof e === "object" && !Array.isArray(e)) : []
   };
+
+  // Sanitize extras enum fields
+  for (const e of normalized.extras) {
+    if (e.status !== undefined && !ALLOWED_STATUS.has(e.status)) {
+      delete e.status;
+    }
+  }
 
   if (areaReports) normalized.areaReports = areaReports;
   if (policies) normalized.policies = policies;
