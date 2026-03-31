@@ -66,7 +66,21 @@ describe("normalizeSharedReportResult", () => {
       /achievedLevel/
     );
 
-    expect(() => normalizeSharedReportResult({ ...validReport, achievedLevel: 0 })).toThrow(
+    expect(() => normalizeSharedReportResult({ ...validReport, achievedLevel: -1 })).toThrow(
+      /achievedLevel/
+    );
+  });
+
+  it("accepts achievedLevel 0 (no levels achieved)", () => {
+    const result = normalizeSharedReportResult({ ...validReport, achievedLevel: 0 });
+    expect(result.achievedLevel).toBe(0);
+  });
+
+  it("rejects non-integer achievedLevel", () => {
+    expect(() => normalizeSharedReportResult({ ...validReport, achievedLevel: 2.5 })).toThrow(
+      /achievedLevel/
+    );
+    expect(() => normalizeSharedReportResult({ ...validReport, achievedLevel: "3" })).toThrow(
       /achievedLevel/
     );
   });

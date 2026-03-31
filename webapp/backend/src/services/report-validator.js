@@ -69,10 +69,10 @@ export function normalizeSharedReportResult(value) {
   if (
     typeof achievedLevel !== "number" ||
     !Number.isInteger(achievedLevel) ||
-    achievedLevel < 1 ||
+    achievedLevel < 0 ||
     achievedLevel > 5
   ) {
-    throw new ReportValidationError("achievedLevel must be an integer 1-5.");
+    throw new ReportValidationError("achievedLevel must be an integer 0-5.");
   }
 
   if (!Array.isArray(pillars)) {

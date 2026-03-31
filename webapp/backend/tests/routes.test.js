@@ -186,5 +186,22 @@ describe("API routes", () => {
       const res = await fetch(`${base}/api/report/not-a-uuid`);
       expect(res.status).toBe(400);
     });
+
+    it("saves and retrieves a report with achievedLevel 0", async () => {
+      const levelZeroResult = { ...validResult, achievedLevel: 0 };
+      const postRes = await fetch(`${base}/api/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ result: levelZeroResult })
+      });
+      expect(postRes.status).toBe(201);
+      const postBody = await postRes.json();
+      expect(postBody).toHaveProperty("id");
+
+      const getRes = await fetch(`${base}/api/report/${postBody.id}`);
+      expect(getRes.status).toBe(200);
+      const getBody = await getRes.json();
+      expect(getBody.achievedLevel).toBe(0);
+    });
   });
 });

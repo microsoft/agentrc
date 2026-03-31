@@ -10,7 +10,7 @@
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="theme-color" content="#0d1117" />
-  <link rel="stylesheet" href="src/main.css" />
+  <link rel="stylesheet" href="/src/main.css" />
   <script>
     // Inline theme init — respect saved preference, default dark
     (function() {
@@ -41,7 +41,7 @@
       <p class="hero-sub">Scan any public GitHub repository to see how ready it is for AI-assisted development.</p>
     </section>
 
-    <form id="scan-form" class="scan-form" autocomplete="off">
+    <form id="scan-form" class="scan-form">
       <div class="input-group">
         <input
           type="text"
@@ -49,6 +49,7 @@
           name="repo_url"
           placeholder="owner/repo or https://github.com/owner/repo"
           required
+          autocomplete="url"
           aria-label="GitHub repository URL"
         />
         <button type="submit" id="scan-btn" class="btn btn-primary">
@@ -99,9 +100,9 @@
     <p>Powered by <a href="https://github.com/microsoft/agentrc" target="_blank" rel="noopener">@microsoft/agentrc</a></p>
   </footer>
 
-  <script type="module" src="src/repo-location.js"></script>
-  <script type="module" src="src/api.js"></script>
-  <script type="module" src="src/report.js"></script>
-  <script type="module" src="src/app.js"></script>
+  <script type="module" src="/src/repo-location.js"></script>
+  <script type="module" src="/src/api.js"></script>
+  <script type="module" src="/src/report.js"></script>
+  <script type="module" src="/src/app.js"></script>
 </body>
 </html>
