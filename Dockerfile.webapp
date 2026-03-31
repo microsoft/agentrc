@@ -3,24 +3,24 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/core/package.json ./packages/core/package.json
 COPY packages/core/src ./packages/core/src
-COPY webapp/backend/package.json ./backend/package.json
-COPY webapp/backend/package-lock.json ./backend/package-lock.json
+COPY webapp/backend/package.json ./webapp/backend/package.json
+COPY webapp/backend/package-lock.json ./webapp/backend/package-lock.json
 RUN npm ci --ignore-scripts
-RUN cd ./backend && npm ci
+RUN cd ./webapp/backend && npm ci
 
 FROM node:24-alpine AS build
 WORKDIR /app
 COPY --from=deps /app /app
-COPY webapp/backend/esbuild.config.js ./backend/esbuild.config.js
-COPY webapp/backend/src ./backend/src
-RUN cd ./backend && node esbuild.config.js
+COPY webapp/backend/esbuild.config.js ./webapp/backend/esbuild.config.js
+COPY webapp/backend/src ./webapp/backend/src
+RUN cd ./webapp/backend && node esbuild.config.js
 
 FROM node:24-alpine
 RUN apk add --no-cache git
-WORKDIR /app/backend
+WORKDIR /app/webapp/backend
 COPY webapp/backend/package.json ./package.json
-COPY --from=deps /app/backend/node_modules ./node_modules
-COPY --from=build /app/backend/dist ./dist
+COPY --from=deps /app/webapp/backend/node_modules ./node_modules
+COPY --from=build /app/webapp/backend/dist ./dist
 COPY webapp/frontend/ /app/frontend/
 ENV REPORTS_DIR=/app/data/reports
 RUN apk upgrade --no-cache \
