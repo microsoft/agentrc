@@ -71,6 +71,18 @@ Works with **GitHub** and **Azure DevOps**. Supports monorepos, multi-root VS Co
 
 > For multi-agent support (Copilot + Claude + others), generate `AGENTS.md` with `--output AGENTS.md`. See [Custom instructions in VS Code](https://code.visualstudio.com/docs/copilot/customization/custom-instructions).
 
+## Works with APM
+
+[APM](https://github.com/microsoft/apm) (Agent Package Manager) distributes agent instructions, skills, and prompts across repos — like npm for AI agent configs.
+
+AgentRC generates the content. APM distributes it:
+
+- **In your project** — run `agentrc init` to generate instructions, then `apm install org/standards` to pull in shared agent packages from your team
+- **For your team** — create a dedicated APM package with your best instructions and skills, then teammates install it with `apm install`
+- **At scale** — `apm audit` scans for security issues; `apm-policy.yml` enforces org standards across all repos
+
+The `.instructions.md` format is shared by both tools — no conversion needed when moving instructions into APM packages.
+
 ## Documentation
 
 |                                                |                                                         |
