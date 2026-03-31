@@ -17,7 +17,7 @@ const validReport = {
       title: "Has README",
       status: "pass",
       level: 1,
-      pillar: "Documentation",
+      pillar: "documentation",
       impact: "high",
       effort: "low",
       reason: "Found README.md",

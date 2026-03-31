@@ -348,7 +348,7 @@ function buildPillarDetails(report) {
                     .map(
                       (c) => `
               <div class="criterion-row">
-                <span class="criterion-row-title">${esc(c.title)}${c.appSummary ? ` <span class="muted small">(${c.appSummary.passed}/${c.appSummary.total} apps)</span>` : ""}${c.areaSummary ? ` <span class="muted small">(${c.areaSummary.passed}/${c.areaSummary.total} areas)</span>` : ""}</span>
+                <span class="criterion-row-title">${esc(c.title)}${c.appSummary ? ` <span class="muted small">(${safeNum(c.appSummary.passed)}/${safeNum(c.appSummary.total)} apps)</span>` : ""}${c.areaSummary ? ` <span class="muted small">(${safeNum(c.areaSummary.passed)}/${safeNum(c.areaSummary.total)} areas)</span>` : ""}</span>
                 <span class="criterion-status ${safeClass(c.status, ALLOWED_STATUS)}">${c.status === "pass" ? "Pass" : c.status === "fail" ? "Fail" : "Skip"}</span>
               </div>
             `
@@ -571,6 +571,11 @@ const ALLOWED_STATUS = new Set(["pass", "fail", "skip"]);
 const ALLOWED_IMPACT = new Set(["high", "medium", "low"]);
 const ALLOWED_EFFORT = new Set(["high", "medium", "low"]);
 const ALLOWED_SIGNAL_STATUS = new Set(["detected", "not-detected", "error"]);
+function safeNum(val) {
+  const n = Number(val);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function safeClass(val, allowed) {
   return allowed.has(val) ? val : "unknown";
 }

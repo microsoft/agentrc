@@ -131,10 +131,22 @@ export function normalizeSharedReportResult(value) {
     throw new ReportValidationError("criteria array too large.");
   }
 
-  // Validate string lengths and enum fields to prevent abuse
-  for (const c of criteria) {
+  // Validate and whitelist criteria fields to prevent XSS via unvalidated nested objects
+  const ALLOWED_CRITERIA_KEYS = new Set([
+    "id", "title", "pillar", "level", "scope", "impact", "effort",
+    "status", "reason", "evidence", "passRate",
+    "appSummary", "areaSummary", "appFailures", "areaFailures"
+  ]);
+  for (let i = 0; i < criteria.length; i++) {
+    const c = criteria[i];
     if (!c || typeof c !== "object" || Array.isArray(c)) {
       throw new ReportValidationError("Each criteria item must be a non-null object.");
+    }
+    // Strip unknown keys
+    for (const key of Object.keys(c)) {
+      if (!ALLOWED_CRITERIA_KEYS.has(key)) {
+        delete c[key];
+      }
     }
     if (c.title !== undefined) {
       if (typeof c.title !== "string") {
@@ -158,6 +170,60 @@ export function normalizeSharedReportResult(value) {
     }
     if (c.effort !== undefined && !ALLOWED_EFFORT.has(c.effort)) {
       delete c.effort;
+    }
+    // Coerce appSummary/areaSummary to { passed: number, total: number } or remove
+    if (c.appSummary !== undefined) {
+      if (c.appSummary && typeof c.appSummary === "object" && !Array.isArray(c.appSummary)) {
+        const passed = Number(c.appSummary.passed);
+        const total = Number(c.appSummary.total);
+        c.appSummary = {
+          passed: Number.isFinite(passed) ? passed : 0,
+          total: Number.isFinite(total) ? total : 0
+        };
+      } else {
+        delete c.appSummary;
+      }
+    }
+    if (c.areaSummary !== undefined) {
+      if (c.areaSummary && typeof c.areaSummary === "object" && !Array.isArray(c.areaSummary)) {
+        const passed = Number(c.areaSummary.passed);
+        const total = Number(c.areaSummary.total);
+        c.areaSummary = {
+          passed: Number.isFinite(passed) ? passed : 0,
+          total: Number.isFinite(total) ? total : 0
+        };
+      } else {
+        delete c.areaSummary;
+      }
+    }
+    // Coerce appFailures/areaFailures to arrays of strings or remove
+    if (c.appFailures !== undefined) {
+      if (Array.isArray(c.appFailures)) {
+        c.appFailures = c.appFailures.filter((f) => typeof f === "string").map((f) => f.slice(0, MAX_STRING_LEN));
+      } else {
+        delete c.appFailures;
+      }
+    }
+    if (c.areaFailures !== undefined) {
+      if (Array.isArray(c.areaFailures)) {
+        c.areaFailures = c.areaFailures.filter((f) => typeof f === "string").map((f) => f.slice(0, MAX_STRING_LEN));
+      } else {
+        delete c.areaFailures;
+      }
+    }
+    // Coerce evidence to array of strings or remove
+    if (c.evidence !== undefined) {
+      if (Array.isArray(c.evidence)) {
+        c.evidence = c.evidence.filter((e) => typeof e === "string").map((e) => e.slice(0, MAX_STRING_LEN));
+      } else {
+        delete c.evidence;
+      }
+    }
+    // Coerce passRate to finite number or remove
+    if (c.passRate !== undefined) {
+      const pr = Number(c.passRate);
+      c.passRate = Number.isFinite(pr) ? pr : undefined;
+      if (c.passRate === undefined) delete c.passRate;
     }
   }
 
