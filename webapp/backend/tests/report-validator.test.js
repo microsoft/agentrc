@@ -95,12 +95,27 @@ describe("normalizeSharedReportResult", () => {
     );
   });
 
-  it("truncates long repo_url", () => {
-    const longUrl = "https://github.com/" + "a".repeat(600);
+  it("accepts valid GitHub repo_url", () => {
     const result = normalizeSharedReportResult({
       ...validReport,
-      repo_url: longUrl
+      repo_url: "https://github.com/microsoft/agentrc"
     });
-    expect(result.repo_url.length).toBeLessThanOrEqual(500);
+    expect(result.repo_url).toBe("https://github.com/microsoft/agentrc");
+  });
+
+  it("omits non-GitHub repo_url", () => {
+    const result = normalizeSharedReportResult({
+      ...validReport,
+      repo_url: "javascript:alert(1)"
+    });
+    expect(result.repo_url).toBeUndefined();
+  });
+
+  it("omits repo_url with non-HTTPS scheme", () => {
+    const result = normalizeSharedReportResult({
+      ...validReport,
+      repo_url: "http://github.com/owner/repo"
+    });
+    expect(result.repo_url).toBeUndefined();
   });
 });

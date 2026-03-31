@@ -25,7 +25,7 @@ export function parseGitHubReference(input) {
   // Full URL
   try {
     const url = new URL(trimmed);
-    if (url.hostname !== "github.com") return null;
+    if (url.protocol !== "https:" || url.hostname !== "github.com") return null;
     const parts = url.pathname
       .replace(/\.git$/, "")
       .split("/")

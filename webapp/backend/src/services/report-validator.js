@@ -12,6 +12,7 @@ export class ReportValidationError extends Error {
 
 const MAX_STRING_LEN = 10_000;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+const GITHUB_URL_RE = /^https:\/\/github\.com\/[a-zA-Z0-9]([a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?\/[a-zA-Z0-9._-]{1,100}$/;
 
 /**
  * Validate and normalize a ReadinessReport for sharing.
@@ -109,7 +110,10 @@ export function normalizeSharedReportResult(value) {
 
   if (areaReports) normalized.areaReports = areaReports;
   if (policies) normalized.policies = policies;
-  if (repo_url) normalized.repo_url = String(repo_url).slice(0, 500);
+  if (repo_url) {
+    const urlStr = String(repo_url).slice(0, 500);
+    if (GITHUB_URL_RE.test(urlStr)) normalized.repo_url = urlStr;
+  }
   if (repo_name) normalized.repo_name = String(repo_name).slice(0, 200);
   if (typeof durationMs === "number" && Number.isFinite(durationMs)) normalized.durationMs = durationMs;
 

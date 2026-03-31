@@ -303,11 +303,15 @@ a:hover { text-decoration: underline; }
   border-radius: 6px;
   padding: 12px 16px;
   margin-bottom: 16px;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: space-between;
   color: var(--color-danger-fg);
   font-size: 13px;
+}
+
+.error-banner[hidden] {
+  display: none;
 }
 
 /* ===== Toast ===== */

@@ -121,7 +121,7 @@ function buildHero(report) {
   el.innerHTML = `
     <div class="hero-level ${levelClass}">${level}</div>
     <div class="hero-info">
-      <div class="hero-name">${report.repo_url ? `<a href="${esc(report.repo_url)}" target="_blank" rel="noopener">${esc(repoLabel)}</a>` : esc(repoLabel)}</div>
+      <div class="hero-name">${report.repo_url && isGitHubUrl(report.repo_url) ? `<a href="${esc(report.repo_url)}" target="_blank" rel="noopener">${esc(repoLabel)}</a>` : esc(repoLabel)}</div>
       <div class="hero-subtitle">Level ${level}: ${esc(name)} — ${totalPassed} of ${totalChecks} checks passing</div>
       ${meta.length ? `<div class="hero-meta">${esc(meta.join(" · "))}</div>` : ""}
       ${nextHtml}
@@ -542,4 +542,13 @@ function esc(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function isGitHubUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.hostname === "github.com";
+  } catch {
+    return false;
+  }
 }

@@ -149,12 +149,12 @@ function hideProgress() {
 function showError(message) {
   const banner = document.getElementById("error-banner");
   const msg = document.getElementById("error-message");
-  banner.style.display = "flex";
+  banner.hidden = false;
   msg.textContent = message;
 }
 
 function hideError() {
-  document.getElementById("error-banner").style.display = "none";
+  document.getElementById("error-banner").hidden = true;
 }
 
 function clearReport() {
