@@ -765,4 +765,126 @@ describe("runReadinessReport", () => {
       );
     });
   });
+
+  describe("ai-tooling pillar — APM criteria", () => {
+    it("fails apm-config when apm.yml does not exist", async () => {
+      await writePackageJson({ name: "test-repo" });
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "apm-config");
+
+      expect(criterion).toBeDefined();
+      expect(criterion?.status).toBe("fail");
+      expect(criterion?.reason).toContain("No apm.yml found");
+      expect(criterion?.pillar).toBe("ai-tooling");
+    });
+
+    it("passes apm-config when apm.yml exists", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("apm.yml", "name: test-package\nversion: 1.0.0");
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "apm-config");
+
+      expect(criterion?.status).toBe("pass");
+    });
+
+    it("skips apm-locked-deps when apm.yml does not exist", async () => {
+      await writePackageJson({ name: "test-repo" });
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "apm-locked-deps");
+
+      expect(criterion?.status).toBe("skip");
+      expect(criterion?.reason).toContain("No apm.yml found");
+    });
+
+    it("fails apm-locked-deps when apm.yml exists but no lockfile", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("apm.yml", "name: test-package\nversion: 1.0.0");
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "apm-locked-deps");
+
+      expect(criterion?.status).toBe("fail");
+      expect(criterion?.reason).toContain("dependencies are not locked");
+    });
+
+    it("passes apm-locked-deps when both apm.yml and apm.lock.yaml exist", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("apm.yml", "name: test-package\nversion: 1.0.0");
+      await writeFile("apm.lock.yaml", "dependencies: {}");
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "apm-locked-deps");
+
+      expect(criterion?.status).toBe("pass");
+    });
+
+    it("skips apm-ci-integration when apm.yml does not exist", async () => {
+      await writePackageJson({ name: "test-repo" });
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "apm-ci-integration");
+
+      expect(criterion?.status).toBe("skip");
+    });
+
+    it("fails apm-ci-integration when apm.yml exists but no workflow uses apm", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("apm.yml", "name: test-package\nversion: 1.0.0");
+      await writeFile(
+        ".github/workflows/ci.yml",
+        "name: CI\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm install"
+      );
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "apm-ci-integration");
+
+      expect(criterion?.status).toBe("fail");
+      expect(criterion?.reason).toContain("No APM step found in CI");
+    });
+
+    it("passes apm-ci-integration when apm install is in a workflow", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("apm.yml", "name: test-package\nversion: 1.0.0");
+      await writeFile(
+        ".github/workflows/ci.yml",
+        "name: CI\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: apm install"
+      );
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "apm-ci-integration");
+
+      expect(criterion?.status).toBe("pass");
+    });
+
+    it("passes apm-ci-integration when apm audit is in a workflow", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("apm.yml", "name: test-package\nversion: 1.0.0");
+      await writeFile(
+        ".github/workflows/security.yml",
+        "name: Security\njobs:\n  audit:\n    runs-on: ubuntu-latest\n    steps:\n      - run: apm audit --ci"
+      );
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "apm-ci-integration");
+
+      expect(criterion?.status).toBe("pass");
+    });
+
+    it("passes apm-ci-integration when microsoft/apm-action is used", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("apm.yml", "name: test-package\nversion: 1.0.0");
+      await writeFile(
+        ".github/workflows/apm.yml",
+        "name: APM\njobs:\n  apm:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: microsoft/apm-action@v1"
+      );
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "apm-ci-integration");
+
+      expect(criterion?.status).toBe("pass");
+    });
+  });
 });

@@ -802,6 +802,25 @@ export function buildCriteria(): ReadinessCriterion[] {
       }
     },
     {
+      id: "apm-config",
+      title: "APM package manifest present",
+      pillar: "ai-tooling",
+      level: 2,
+      scope: "repo",
+      impact: "medium",
+      effort: "low",
+      check: async (context) => {
+        const found = await hasApmConfig(context.repoPath);
+        return {
+          status: found ? "pass" : "fail",
+          reason: found
+            ? undefined
+            : "No apm.yml found. Use APM to install shared agent packages and keep instructions in sync across repos. See: https://github.com/microsoft/apm",
+          evidence: ["apm.yml"]
+        };
+      }
+    },
+    {
       id: "custom-agents",
       title: "Custom AI agents configured",
       pillar: "ai-tooling",
@@ -836,6 +855,52 @@ export function buildCriteria(): ReadinessCriterion[] {
           reason: "No Copilot or Claude skills found (e.g. .copilot/skills/, .github/skills/).",
           evidence:
             found.length > 0 ? found : [".copilot/skills/", ".github/skills/", ".claude/skills/"]
+        };
+      }
+    },
+    {
+      id: "apm-locked-deps",
+      title: "APM dependencies locked",
+      pillar: "ai-tooling",
+      level: 3,
+      scope: "repo",
+      impact: "medium",
+      effort: "low",
+      check: async (context) => {
+        const hasConfig = await hasApmConfig(context.repoPath);
+        if (!hasConfig) {
+          return { status: "skip", reason: "No apm.yml found — skipping lockfile check." };
+        }
+        const found = await hasApmLockfile(context.repoPath);
+        return {
+          status: found ? "pass" : "fail",
+          reason: found
+            ? undefined
+            : "apm.yml found but dependencies are not locked. Run `apm install` to generate apm.lock.yaml.",
+          evidence: ["apm.lock.yaml"]
+        };
+      }
+    },
+    {
+      id: "apm-ci-integration",
+      title: "APM integrated in CI pipeline",
+      pillar: "ai-tooling",
+      level: 4,
+      scope: "repo",
+      impact: "high",
+      effort: "medium",
+      check: async (context) => {
+        const hasConfig = await hasApmConfig(context.repoPath);
+        if (!hasConfig) {
+          return { status: "skip", reason: "No apm.yml found — skipping CI check." };
+        }
+        const found = await hasApmInWorkflows(context.repoPath);
+        return {
+          status: found ? "pass" : "fail",
+          reason: found
+            ? undefined
+            : "No APM step found in CI. Add `microsoft/apm-action` to your workflow to audit agent packages on every PR. See: https://github.com/microsoft/apm-action",
+          evidence: [".github/workflows/*.{yml,yaml}"]
         };
       }
     },
@@ -1378,4 +1443,36 @@ async function readAllDependencies(context: ReadinessContext): Promise<string[]>
   }
 
   return Array.from(new Set(dependencies));
+}
+
+// ── APM (Agent Package Manager) helpers ──
+
+async function hasApmConfig(repoPath: string): Promise<boolean> {
+  return fileExists(path.join(repoPath, "apm.yml"));
+}
+
+async function hasApmLockfile(repoPath: string): Promise<boolean> {
+  return fileExists(path.join(repoPath, "apm.lock.yaml"));
+}
+
+async function hasApmInWorkflows(repoPath: string): Promise<boolean> {
+  const workflowDir = path.join(repoPath, ".github", "workflows");
+  let files: string[];
+  try {
+    files = await fs.readdir(workflowDir);
+  } catch {
+    return false;
+  }
+  for (const file of files) {
+    if (!file.endsWith(".yml") && !file.endsWith(".yaml")) continue;
+    try {
+      const content = await fs.readFile(path.join(workflowDir, file), "utf8");
+      if (/\bmicrosoft\/apm-action\b/.test(content) || /\bapm\s+(audit|install)\b/.test(content)) {
+        return true;
+      }
+    } catch {
+      // skip unreadable files
+    }
+  }
+  return false;
 }

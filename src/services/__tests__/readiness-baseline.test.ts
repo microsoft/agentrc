@@ -171,6 +171,9 @@ describe("buildCriteria baseline", () => {
     const criteria = buildCriteria();
     const ids = criteria.map((c) => c.id).sort();
     expect(ids).toEqual([
+      "apm-ci-integration",
+      "apm-config",
+      "apm-locked-deps",
       "area-build-script",
       "area-instructions",
       "area-readme",
