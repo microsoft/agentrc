@@ -1,4 +1,6 @@
+import { execFile } from "child_process";
 import path from "path";
+import { promisify } from "util";
 
 import { analyzeRepo } from "@agentrc/core/services/analyzer";
 import type {
@@ -19,11 +21,11 @@ import { buildAuthedUrl, cloneRepo, isGitRepo, setRemoteUrl } from "@agentrc/cor
 import type { GitHubRepo } from "@agentrc/core/services/github";
 import { getGitHubToken, listAccessibleRepos } from "@agentrc/core/services/github";
 import { generateCopilotInstructions } from "@agentrc/core/services/instructions";
-import { ensureDir, safeWriteFile, validateCachePath } from "@agentrc/core/utils/fs";
+import { ensureDir, fileExists, safeWriteFile, validateCachePath } from "@agentrc/core/utils/fs";
 import { prettyPrintSummary } from "@agentrc/core/utils/logger";
 import type { CommandResult } from "@agentrc/core/utils/output";
 import { outputResult, outputError, deriveFileStatus, shouldLog } from "@agentrc/core/utils/output";
-import { checkbox, select } from "@inquirer/prompts";
+import { checkbox, confirm, select } from "@inquirer/prompts";
 
 type InitOptions = {
   github?: boolean;
@@ -244,6 +246,9 @@ export async function initCommand(
     }
   }
 
+  // ── APM bridge: offer to initialize APM for cross-team distribution ──
+  await offerApmInit(repoPath, options);
+
   if (options.json) {
     const { ok, status } = deriveFileStatus(allFiles);
     const result: CommandResult<{
@@ -266,5 +271,59 @@ export async function initCommand(
       process.stderr.write("  agentrc instructions --areas   Generate per-area instructions\n");
     }
     process.stderr.write("  agentrc eval --init            Scaffold evaluation test cases\n");
+  }
+}
+
+const execFileAsync = promisify(execFile);
+
+const APM_TIMEOUT_MS = 10_000;
+
+export async function isApmInstalled(): Promise<boolean> {
+  try {
+    await execFileAsync("apm", ["--version"], { timeout: APM_TIMEOUT_MS });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function offerApmInit(repoPath: string, options: InitOptions): Promise<void> {
+  if (options.json) return;
+
+  const hasApmYml = await fileExists(path.join(repoPath, "apm.yml"));
+  if (hasApmYml) return;
+
+  const apmAvailable = await isApmInstalled();
+
+  if (apmAvailable) {
+    const accepted = options.yes
+      ? true
+      : await confirm({
+          message: "Set up APM to install and share agent packages across your team?",
+          default: false
+        });
+    if (accepted) {
+      try {
+        await execFileAsync("apm", ["init", "--yes"], { cwd: repoPath, timeout: APM_TIMEOUT_MS });
+        if (shouldLog(options)) {
+          process.stderr.write(
+            "APM initialized — run `apm install <package>` to add shared agent packages.\n"
+          );
+        }
+      } catch (error) {
+        if (shouldLog(options)) {
+          process.stderr.write(
+            `Warning: APM init failed; continuing without APM: ${
+              error instanceof Error ? error.message : String(error)
+            }\n`
+          );
+        }
+      }
+    }
+  } else if (shouldLog(options)) {
+    process.stderr.write(
+      "\nTip: use APM to install shared agent packages and distribute your instructions across repos.\n" +
+        "     https://github.com/microsoft/apm\n"
+    );
   }
 }
