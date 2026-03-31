@@ -44,7 +44,7 @@
         "description": "Enable report sharing (requires Azure Files)"
       }
     },
-    "githubTokenForScan": {
+    "ghTokenForScan": {
       "type": "securestring",
       "defaultValue": "",
       "metadata": {
@@ -218,7 +218,7 @@
               "passwordSecretRef": "acr-password"
             }
           ],
-          "secrets": "[concat(createArray(createObject('name', 'acr-password', 'value', listCredentials(resourceId('Microsoft.ContainerRegistry/registries', toLower(replace(format('{0}webapp', parameters('namePrefix')), '-', ''))), '2023-07-01').passwords[0].value)), if(not(empty(parameters('githubTokenForScan'))), createArray(createObject('name', 'gh-token-for-scan', 'value', parameters('githubTokenForScan'))), createArray()), if(parameters('enableAppInsights'), createArray(createObject('name', 'app-insights-connection-string', 'value', reference(resourceId('Microsoft.Insights/components', format('{0}-insights', parameters('namePrefix'))), '2020-02-02').ConnectionString)), createArray()))]"
+          "secrets": "[concat(createArray(createObject('name', 'acr-password', 'value', listCredentials(resourceId('Microsoft.ContainerRegistry/registries', toLower(replace(format('{0}webapp', parameters('namePrefix')), '-', ''))), '2023-07-01').passwords[0].value)), if(not(empty(parameters('ghTokenForScan'))), createArray(createObject('name', 'gh-token-for-scan', 'value', parameters('ghTokenForScan'))), createArray()), if(parameters('enableAppInsights'), createArray(createObject('name', 'app-insights-connection-string', 'value', reference(resourceId('Microsoft.Insights/components', format('{0}-insights', parameters('namePrefix'))), '2020-02-02').ConnectionString)), createArray()))]"
         },
         "template": {
           "containers": [
@@ -229,7 +229,7 @@
                 "cpu": "[json('0.25')]",
                 "memory": "0.5Gi"
               },
-              "env": "[concat(createArray(createObject('name', 'NODE_ENV', 'value', 'production'), createObject('name', 'PORT', 'value', '3000'), createObject('name', 'ENABLE_SHARING', 'value', if(parameters('enableSharing'), 'true', 'false')), createObject('name', 'REPORTS_DIR', 'value', if(parameters('enableSharing'), '/app/data/reports', ':memory:'))), if(not(empty(parameters('githubTokenForScan'))), createArray(createObject('name', 'GH_TOKEN_FOR_SCAN', 'secretRef', 'gh-token-for-scan')), createArray()), if(parameters('enableAppInsights'), createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'secretRef', 'app-insights-connection-string')), createArray()))]",
+              "env": "[concat(createArray(createObject('name', 'NODE_ENV', 'value', 'production'), createObject('name', 'PORT', 'value', '3000'), createObject('name', 'ENABLE_SHARING', 'value', if(parameters('enableSharing'), 'true', 'false')), createObject('name', 'REPORTS_DIR', 'value', if(parameters('enableSharing'), '/app/data/reports', ':memory:'))), if(not(empty(parameters('ghTokenForScan'))), createArray(createObject('name', 'GH_TOKEN_FOR_SCAN', 'secretRef', 'gh-token-for-scan')), createArray()), if(parameters('enableAppInsights'), createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'secretRef', 'app-insights-connection-string')), createArray()))]",
               "probes": [
                 {
                   "type": "Liveness",

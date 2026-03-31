@@ -18,7 +18,7 @@ param enableSharing bool = true
 
 @description('GitHub token for scanning private repos')
 @secure()
-param githubTokenForScan string = ''
+param ghTokenForScan string = ''
 
 @description('Container startup strategy')
 @allowed(['scale-to-zero', 'keep-warm'])
@@ -161,10 +161,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             value: acr.listCredentials().passwords[0].value
           }
         ],
-        !empty(githubTokenForScan) ? [
+        !empty(ghTokenForScan) ? [
           {
             name: 'gh-token-for-scan'
-            value: githubTokenForScan
+            value: ghTokenForScan
           }
         ] : [],
         enableAppInsights ? [
@@ -202,7 +202,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: enableSharing ? '/app/data/reports' : ':memory:'
             }
           ],
-          !empty(githubTokenForScan) ? [
+          !empty(ghTokenForScan) ? [
             {
               name: 'GH_TOKEN_FOR_SCAN'
               secretRef: 'gh-token-for-scan'

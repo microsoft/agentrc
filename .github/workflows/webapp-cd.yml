@@ -107,7 +107,7 @@ jobs:
           template: ${{ env.BICEP_FILE }}
           parameters: >
             containerImageTag=${{ needs.build-push.outputs.image-tag }}
-            githubTokenForScan=${{ secrets.GH_TOKEN_FOR_SCAN }}
+            ghTokenForScan=${{ secrets.GH_TOKEN_FOR_SCAN }}
 
       - name: Smoke test
         run: |
