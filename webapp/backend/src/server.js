@@ -2,8 +2,9 @@
  * Express server factory and startup.
  * createRuntime() → createApp(runtime) → listen
  */
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, join } from "node:path";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -25,6 +26,8 @@ export function createRuntime() {
   const sharingEnabled = process.env.ENABLE_SHARING === "true";
   const reportsDir = process.env.REPORTS_DIR || ":memory:";
   const frontendPath = resolve(__dirname, "../../frontend");
+  const customDomain = (process.env.CUSTOM_DOMAIN || "").replace(/\/+$/, "");
+  const siteUrl = customDomain ? `https://${customDomain}` : "";
   const appInsightsConnectionString =
     process.env.APPLICATIONINSIGHTS_CONNECTION_STRING ||
     process.env.PUBLIC_APPLICATIONINSIGHTS_CONNECTION_STRING ||
@@ -37,6 +40,7 @@ export function createRuntime() {
     sharingEnabled,
     reportsDir,
     frontendPath,
+    siteUrl,
     appInsightsConnectionString,
     storage: createStorage(reportsDir),
     cloneTimeoutMs: parseInt(process.env.SCAN_CLONE_TIMEOUT_MS || "60000", 10),
@@ -87,14 +91,21 @@ export function createApp(runtime) {
   app.use("/api/scan", createScanRateLimiter(runtime), createScanRouter(runtime));
   app.use("/api/report", createReportRateLimiter(runtime), createReportRouter(runtime));
 
-  // Static frontend files
+  // Pre-render index.html — replace %SITE_URL% placeholder with https://<CUSTOM_DOMAIN>
+  const rawIndexHtml = readFileSync(join(runtime.frontendPath, "index.html"), "utf-8");
+  const indexHtml = rawIndexHtml.replaceAll("%SITE_URL%", runtime.siteUrl);
+
+  // Serve processed index.html for root requests
+  app.get("/", (_req, res) => {
+    res.type("html").send(indexHtml);
+  });
+
+  // Static frontend files (other assets)
   app.use(express.static(runtime.frontendPath));
 
-  // SPA catch-all: serve index.html for non-API routes
-  app.get(/^\/(?!api\/).*/, (_req, res, next) => {
-    res.sendFile("index.html", { root: runtime.frontendPath }, (err) => {
-      if (err) next(err);
-    });
+  // SPA catch-all: serve processed index.html for non-API routes
+  app.get(/^\/(?!api\/).*/, (_req, res) => {
+    res.type("html").send(indexHtml);
   });
 
   // Error handling

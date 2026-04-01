@@ -141,6 +141,7 @@ jobs:
           parameters: >
             containerImageTag=${{ needs.build-push.outputs.image-tag }}
             ghTokenForScan=${{ secrets.GH_TOKEN_FOR_SCAN }}
+            useAcrAdminCredentials=true
             customDomain=${{ vars.CUSTOM_DOMAIN || '' }}
             customDomainCertReady=false
 
@@ -153,6 +154,7 @@ jobs:
           parameters: >
             containerImageTag=${{ needs.build-push.outputs.image-tag }}
             ghTokenForScan=${{ secrets.GH_TOKEN_FOR_SCAN }}
+            useAcrAdminCredentials=true
             customDomain=${{ vars.CUSTOM_DOMAIN || '' }}
             customDomainCertReady=true
 

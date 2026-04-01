@@ -32,6 +32,9 @@ param customDomain string = ''
 @description('Set to true only after DNS records (CNAME + TXT) are verified. First deploy with false to get verification ID.')
 param customDomainCertReady bool = false
 
+@description('Use ACR admin credentials instead of managed identity (set to true when the deploying SP lacks role-assignment write permissions)')
+param useAcrAdminCredentials bool = false
+
 @description('Tags for all resources')
 param tags object = {}
 
@@ -121,7 +124,7 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
     name: 'Basic'
   }
   properties: {
-    adminUserEnabled: false
+    adminUserEnabled: useAcrAdminCredentials
   }
 }
 
@@ -155,7 +158,7 @@ resource managedCert 'Microsoft.App/managedEnvironments/managedCertificates@2024
 @description('AcrPull built-in role')
 var acrPullRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
 
-resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!useAcrAdminCredentials) {
   name: guid(acr.id, acrPullIdentity.id, acrPullRoleId)
   scope: acr
   properties: {
@@ -191,14 +194,25 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
         ] : []
       }
-      registries: [
+      registries: useAcrAdminCredentials ? [
+        {
+          server: acr.properties.loginServer
+          username: acr.listCredentials().username
+          passwordSecretRef: 'acr-password'
+        }
+      ] : [
         {
           server: acr.properties.loginServer
           identity: acrPullIdentity.id
         }
       ]
       secrets: concat(
-        [],
+        useAcrAdminCredentials ? [
+          {
+            name: 'acr-password'
+            value: acr.listCredentials().passwords[0].value
+          }
+        ] : [],
         !empty(ghTokenForScan) ? [
           {
             name: 'gh-token-for-scan'
@@ -240,6 +254,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: enableSharing ? '/app/data/reports' : ':memory:'
             }
           ],
+          !empty(customDomain) ? [
+            {
+              name: 'CUSTOM_DOMAIN'
+              value: customDomain
+            }
+          ] : [],
           !empty(ghTokenForScan) ? [
             {
               name: 'GH_TOKEN_FOR_SCAN'
