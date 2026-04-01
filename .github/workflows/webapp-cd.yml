@@ -1,0 +1,178 @@
+name: Webapp CD
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "webapp/**"
+      - "packages/core/**"
+      - "Dockerfile.webapp"
+      - "infra/webapp/**"
+
+concurrency:
+  group: agentrc-webapp-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/agentrc-webapp
+  RESOURCE_GROUP: agentrc-webapp-rg
+  BICEP_FILE: infra/webapp/main.bicep
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+      image-full: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.webapp
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build-push
+    permissions:
+      security-events: write
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: ${{ needs.build-push.outputs.image-full }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build-push, security-scan]
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure resource group
+        run: |
+          az group create \
+            --name ${{ env.RESOURCE_GROUP }} \
+            --location eastus \
+            --tags application=agentrc-webapp managedBy=bicep
+
+      - name: Push image to ACR
+        run: |
+          ACR_NAME=$(az acr list --resource-group ${{ env.RESOURCE_GROUP }} --query "[0].name" -o tsv)
+          if [ -z "$ACR_NAME" ]; then
+            echo "ACR not yet provisioned — will be created by Bicep and image imported after"
+          else
+            az acr import \
+              --name "$ACR_NAME" \
+              --source ${{ needs.build-push.outputs.image-full }} \
+              --image agentrc-webapp:${{ needs.build-push.outputs.image-tag }} \
+              --image agentrc-webapp:latest \
+              --force
+          fi
+
+      - name: Pre-deploy cleanup (Container Apps storage update limitation)
+        run: |
+          az containerapp delete \
+            --name agentrc-webapp \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --yes 2>&1 || echo "Container app does not exist yet"
+          SUB_ID=$(az account show --query id -o tsv)
+          az rest --method DELETE \
+            --url "https://management.azure.com/subscriptions/${SUB_ID}/resourceGroups/${{ env.RESOURCE_GROUP }}/providers/Microsoft.App/managedEnvironments/agentrc-env/storages/reportsshare?api-version=2024-03-01" \
+            2>&1 || echo "Storage mount does not exist yet"
+          sleep 10
+
+      - name: Deploy infrastructure
+        uses: azure/arm-deploy@v2
+        with:
+          resourceGroupName: ${{ env.RESOURCE_GROUP }}
+          template: ${{ env.BICEP_FILE }}
+          parameters: >
+            containerImageTag=${{ needs.build-push.outputs.image-tag }}
+            ghTokenForScan=${{ secrets.GH_TOKEN_FOR_SCAN }}
+
+      - name: Ensure image in ACR
+        run: |
+          ACR_NAME=$(az acr list --resource-group ${{ env.RESOURCE_GROUP }} --query "[0].name" -o tsv)
+          az acr import \
+            --name "$ACR_NAME" \
+            --source ${{ needs.build-push.outputs.image-full }} \
+            --image agentrc-webapp:${{ needs.build-push.outputs.image-tag }} \
+            --image agentrc-webapp:latest \
+            --force
+
+      - name: Restart container app to pick up new image
+        run: |
+          az containerapp revision restart \
+            --name agentrc-webapp \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --revision "$(az containerapp revision list --name agentrc-webapp --resource-group ${{ env.RESOURCE_GROUP }} --query '[0].name' -o tsv)"
+
+      - name: Smoke test
+        run: |
+          APP_URL=$(az containerapp show \
+            --name agentrc-webapp \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "properties.configuration.ingress.fqdn" -o tsv)
+          echo "Testing https://${APP_URL}"
+          for i in 1 2 3 4 5; do
+            if curl -sf "https://${APP_URL}/api/health" | grep -q '"ok"'; then
+              break
+            fi
+            echo "Attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
+          curl -sf "https://${APP_URL}/api/health" | grep -q '"ok"'
+          curl -sf "https://${APP_URL}/" | grep -q "AgentRC"
+          echo "Smoke tests passed!"

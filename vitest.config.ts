@@ -10,6 +10,7 @@ export default defineConfig({
   test: {
     environment: "node",
     testTimeout: 10_000,
+    exclude: ["webapp/**", "node_modules/**", "dist/**", "vscode-extension/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "json-summary"],

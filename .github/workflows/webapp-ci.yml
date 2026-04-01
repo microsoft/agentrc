@@ -1,0 +1,74 @@
+name: Webapp CI
+
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - "webapp/**"
+      - "packages/core/**"
+      - "Dockerfile.webapp"
+      - "infra/webapp/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "webapp/**"
+      - "packages/core/**"
+      - "Dockerfile.webapp"
+      - "infra/webapp/**"
+
+concurrency:
+  group: webapp-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: webapp/backend/package-lock.json
+      - name: Install root dependencies
+        run: npm ci
+      - name: Install backend dependencies
+        run: cd webapp/backend && npm ci
+      - name: Run tests
+        run: cd webapp/backend && npm test
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: webapp/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: cd webapp/frontend && npm ci
+      - name: Run tests
+        run: cd webapp/frontend && npm test
+
+  build-and-scan:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -f Dockerfile.webapp -t agentrc-webapp:test .
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: agentrc-webapp:test
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif

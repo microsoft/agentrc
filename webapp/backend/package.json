@@ -1,0 +1,24 @@
+{
+  "name": "@agentrc/webapp-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node esbuild.config.js",
+    "start": "node dist/server.js",
+    "dev": "node --import tsx --env-file-if-exists=../.env --watch src/server.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0"
+  },
+  "devDependencies": {
+    "@agentrc/core": "file:../../packages/core",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.21.0",
+    "vitest": "^3.1.1"
+  }
+}

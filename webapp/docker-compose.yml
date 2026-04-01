@@ -1,0 +1,15 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile.webapp
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    env_file:
+      - .env
+    volumes:
+      - reports-data:/app/data
+volumes:
+  # Persists shared reports across container restarts.
+  # Set REPORTS_DIR=/app/data/reports in .env to enable (default is :memory:).
+  reports-data:

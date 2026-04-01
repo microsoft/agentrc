@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentRC — AI Readiness Scanner</title>
+  <meta name="description" content="Scan any GitHub repository for AI-assisted development readiness. Get an instant report with actionable recommendations." />
+  <meta property="og:title" content="AgentRC — AI Readiness Scanner" />
+  <meta property="og:description" content="Scan any GitHub repository for AI-assisted development readiness." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#0d1117" />
+  <link rel="stylesheet" href="/src/main.css" />
+  <script src="/src/theme-init.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="/" class="logo">
+        <span class="logo-icon">⛶</span>
+        <span class="logo-text">AgentRC | Context engineering for AI coding agents</span>
+      </a>
+      <nav class="topbar-nav">
+        <a href="https://github.com/microsoft/agentrc" target="_blank" rel="noopener">GitHub</a>
+        <button id="theme-toggle" class="btn-icon" aria-label="Toggle theme">🌙</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero-intro">
+      <h1>AI Readiness Scanner</h1>
+      <p class="hero-sub">Scan any public GitHub repository to see how ready it is for AI-assisted development.</p>
+    </section>
+
+    <form id="scan-form" class="scan-form">
+      <div class="input-group">
+        <input
+          type="text"
+          id="repo-input"
+          name="repo_url"
+          placeholder="owner/repo or https://github.com/owner/repo"
+          required
+          autocomplete="url"
+          aria-label="GitHub repository URL"
+        />
+        <button type="submit" id="scan-btn" class="btn btn-primary">
+          <span class="btn-label">Scan</span>
+          <span class="btn-spinner" hidden></span>
+        </button>
+      </div>
+    </form>
+
+    <section id="scan-description" class="scan-description">
+      <h2>What the readiness report evaluates</h2>
+      <ul>
+        <li><strong>AI Tooling</strong> — Custom instructions, MCP configuration, custom agents, and Copilot skills</li>
+        <li><strong>Build System</strong> — Build scripts, CI/CD workflows, and monorepo workspace configuration</li>
+        <li><strong>Testing</strong> — Test scripts at root and per-area level</li>
+        <li><strong>Documentation</strong> — README, CONTRIBUTING guide, and area-level docs</li>
+        <li><strong>Dev Environment</strong> — Lockfile presence and <code>.env.example</code> templates</li>
+        <li><strong>Style &amp; Validation</strong> — Linting, formatting, and type checking configuration</li>
+        <li><strong>Security &amp; Governance</strong> — LICENSE, CODEOWNERS, SECURITY.md, and Dependabot setup</li>
+        <li><strong>Code Quality &amp; Observability</strong> — Formatter config, logging, and OpenTelemetry instrumentation</li>
+      </ul>
+      <p class="scan-description-note">
+        Checks are scored across 5 maturity levels — from <strong>Functional</strong> to <strong>Autonomous</strong> — with actionable recommendations for each gap.
+      </p>
+      <p class="scan-description-surfaces">
+        This web scanner runs a subset of the full AgentRC analysis. For the complete experience — including <code>init</code>, <code>generate</code>, policy enforcement, and batch org-wide scans — use the <a href="https://github.com/microsoft/agentrc" target="_blank" rel="noopener">CLI</a> or the <a href="https://github.com/microsoft/agentrc/blob/main/docs/extension.md" target="_blank" rel="noopener">VS Code extension</a>.
+      </p>
+    </section>
+
+    <div id="progress" class="progress-area" hidden>
+      <span class="spinner" aria-hidden="true"></span>
+      <p class="progress-text" id="progress-text">Cloning repository…</p>
+    </div>
+
+    <div id="error-banner" class="error-banner" hidden>
+      <p id="error-message"></p>
+      <button id="error-dismiss" class="btn-icon" aria-label="Dismiss">✕</button>
+    </div>
+
+    <div id="report" class="report-container"></div>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <footer class="footer">
+    <p>Powered by <a href="https://github.com/microsoft/agentrc" target="_blank" rel="noopener">@microsoft/agentrc</a></p>
+  </footer>
+
+  <script type="module" src="/src/app.js"></script>
+</body>
+</html>

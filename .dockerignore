@@ -1,0 +1,41 @@
+# Dependencies (re-installed inside Docker)
+node_modules
+
+# Build outputs
+dist
+*.tgz
+
+# Git / CI
+.git
+.github
+.husky
+
+# CLI source (not needed for webapp)
+src
+plugin
+infra
+
+# VS Code extension
+vscode-extension
+
+# Docs / examples
+docs
+examples
+
+# Non-essential root files
+eval-results.*
+readiness-report.html
+CHANGELOG.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+SECURITY.md
+SUPPORT.md
+CODEOWNERS
+LICENSE
+AGENTS.md
+agentrc.eval.json
+eslint.config.js
+vitest.config.ts
+tsconfig.json
+tsup.config.ts
+.vscode
