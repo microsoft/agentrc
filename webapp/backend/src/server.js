@@ -19,6 +19,28 @@ import { startStaleDirSweeper, stopStaleDirSweeper } from "./services/scanner.js
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Validate and normalise CUSTOM_DOMAIN to a bare hostname.
+ * Strips protocol, path, port, and whitespace.  Throws on
+ * clearly-invalid values so misconfigurations surface at startup.
+ */
+function parseCustomDomain(raw) {
+  if (!raw) return "";
+  let host = raw.trim();
+  // Strip protocol prefix if provided (e.g. "https://example.com")
+  host = host.replace(/^https?:\/\//i, "");
+  // Strip path, query, fragment
+  host = host.split("/")[0].split("?")[0].split("#")[0];
+  // Strip port (e.g. "example.com:443")
+  host = host.replace(/:\d+$/, "");
+  if (!host || /\s/.test(host) || !/\./.test(host)) {
+    throw new Error(
+      `Invalid CUSTOM_DOMAIN: "${raw}". Expected a bare hostname (e.g. "app.example.com").`
+    );
+  }
+  return host;
+}
+
 /** Load env vars and build computed runtime config. */
 export function createRuntime() {
   const port = parseInt(process.env.PORT || "3000", 10);
@@ -26,7 +48,7 @@ export function createRuntime() {
   const sharingEnabled = process.env.ENABLE_SHARING === "true";
   const reportsDir = process.env.REPORTS_DIR || ":memory:";
   const frontendPath = resolve(__dirname, "../../frontend");
-  const customDomain = (process.env.CUSTOM_DOMAIN || "").replace(/\/+$/, "");
+  const customDomain = parseCustomDomain(process.env.CUSTOM_DOMAIN);
   const siteUrl = customDomain ? `https://${customDomain}` : "";
   const appInsightsConnectionString =
     process.env.APPLICATIONINSIGHTS_CONNECTION_STRING ||
@@ -91,21 +113,34 @@ export function createApp(runtime) {
   app.use("/api/scan", createScanRateLimiter(runtime), createScanRouter(runtime));
   app.use("/api/report", createReportRateLimiter(runtime), createReportRouter(runtime));
 
-  // Pre-render index.html — replace %SITE_URL% placeholder with https://<CUSTOM_DOMAIN>
+  // Read the raw index.html template once at startup.
+  // %SITE_URL% is replaced at request time so OG/Twitter tags always
+  // contain absolute URLs — even when CUSTOM_DOMAIN is not configured.
   const rawIndexHtml = readFileSync(join(runtime.frontendPath, "index.html"), "utf-8");
-  const indexHtml = rawIndexHtml.replaceAll("%SITE_URL%", runtime.siteUrl);
+
+  // If a custom domain is configured, pre-render once (fast path).
+  // Otherwise, derive the base URL per-request from the Host header.
+  const preRenderedHtml = runtime.siteUrl
+    ? rawIndexHtml.replaceAll("%SITE_URL%", runtime.siteUrl)
+    : null;
+
+  function renderIndex(req) {
+    if (preRenderedHtml) return preRenderedHtml;
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    return rawIndexHtml.replaceAll("%SITE_URL%", baseUrl);
+  }
 
   // Serve processed index.html for root requests
-  app.get("/", (_req, res) => {
-    res.type("html").send(indexHtml);
+  app.get("/", (req, res) => {
+    res.type("html").send(renderIndex(req));
   });
 
   // Static frontend files (other assets)
   app.use(express.static(runtime.frontendPath));
 
   // SPA catch-all: serve processed index.html for non-API routes
-  app.get(/^\/(?!api\/).*/, (_req, res) => {
-    res.type("html").send(indexHtml);
+  app.get(/^\/(?!api\/).*/, (req, res) => {
+    res.type("html").send(renderIndex(req));
   });
 
   // Error handling

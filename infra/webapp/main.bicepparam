@@ -2,7 +2,7 @@ using './main.bicep'
 
 param namePrefix = 'agentrc'
 param containerImageTag = 'latest'
-param useAcrAdminCredentials = true
+param useAcrAdminCredentials = false
 param enableSharing = true
 param enableAppInsights = true
 param containerStartupStrategy = 'keep-warm'
