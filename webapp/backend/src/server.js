@@ -33,10 +33,56 @@ function parseCustomDomain(raw) {
   host = host.split("/")[0].split("?")[0].split("#")[0];
   // Strip port (e.g. "example.com:443")
   host = host.replace(/:\d+$/, "");
-  if (!host || /\s/.test(host) || !/\./.test(host)) {
+
+  // Basic sanity checks before detailed hostname validation
+  if (!host || /\s/.test(host)) {
     throw new Error(
       `Invalid CUSTOM_DOMAIN: "${raw}". Expected a bare hostname (e.g. "app.example.com").`
     );
+  }
+
+  // Reject obvious delimiters / malformed forms: commas, leading/trailing dot, consecutive dots
+  if (host.includes(",") || host.startsWith(".") || host.endsWith(".") || host.includes("..")) {
+    throw new Error(
+      `Invalid CUSTOM_DOMAIN: "${raw}". Expected a valid DNS hostname without commas or malformed dots.`
+    );
+  }
+
+  // Enforce overall hostname length (per RFC 1034/1035 recommendations)
+  if (host.length > 253) {
+    throw new Error(
+      `Invalid CUSTOM_DOMAIN: "${raw}". Hostname is too long; must be 253 characters or fewer.`
+    );
+  }
+
+  const labels = host.split(".");
+  // Require at least one dot (i.e. two labels)
+  if (labels.length < 2) {
+    throw new Error(
+      `Invalid CUSTOM_DOMAIN: "${raw}". Expected a bare hostname with at least one dot (e.g. "app.example.com").`
+    );
+  }
+
+  const labelRegex = /^[a-zA-Z0-9-]+$/;
+  for (const label of labels) {
+    // Each label must be non-empty and 1–63 characters
+    if (!label || label.length > 63) {
+      throw new Error(
+        `Invalid CUSTOM_DOMAIN: "${raw}". Each hostname label must be between 1 and 63 characters.`
+      );
+    }
+    // Only allow letters, digits, and hyphens (supports punycode "xn--" labels)
+    if (!labelRegex.test(label)) {
+      throw new Error(
+        `Invalid CUSTOM_DOMAIN: "${raw}". Hostname labels may only contain letters, digits, and hyphens.`
+      );
+    }
+    // Labels must not start or end with a hyphen
+    if (label.startsWith("-") || label.endsWith("-")) {
+      throw new Error(
+        `Invalid CUSTOM_DOMAIN: "${raw}". Hostname labels must not start or end with a hyphen.`
+      );
+    }
   }
   return host;
 }
