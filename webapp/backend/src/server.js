@@ -126,7 +126,16 @@ export function createApp(runtime) {
 
   function renderIndex(req) {
     if (preRenderedHtml) return preRenderedHtml;
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+    // Derive a safe base URL when CUSTOM_DOMAIN/runtime.siteUrl is not set.
+    // Use Express's hostname handling and constrain to known-safe dev hosts.
+    const allowedDevHosts = new Set(["localhost", "127.0.0.1", "::1"]);
+    let hostname = req.hostname;
+    if (!allowedDevHosts.has(hostname)) {
+      hostname = "localhost";
+    }
+
+    const baseUrl = `${req.protocol}://${hostname}:${runtime.port}`;
     return rawIndexHtml.replaceAll("%SITE_URL%", baseUrl);
   }
 
