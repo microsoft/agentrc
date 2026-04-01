@@ -18,7 +18,7 @@ describe("favicon assets exist", () => {
     "apple-touch-icon.png",
     "favicon-192x192.png",
     "favicon-512x512.png",
-    "og-image.png",
+    "og-image.jpg",
     "site.webmanifest",
   ];
 
@@ -37,7 +37,6 @@ describe("PNG files have valid signature", () => {
     "apple-touch-icon.png",
     "favicon-192x192.png",
     "favicon-512x512.png",
-    "og-image.png",
   ];
   const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -47,6 +46,17 @@ describe("PNG files have valid signature", () => {
       expect(buf.subarray(0, 8).equals(PNG_SIGNATURE)).toBe(true);
     });
   }
+});
+
+// ── JPEG file signature ──────────────────────────────────────────────
+describe("og-image.jpg", () => {
+  it("has valid JPEG signature", () => {
+    const buf = readFileSync(join(assetsDir, "og-image.jpg"));
+    // JPEG magic: FF D8 FF
+    expect(buf[0]).toBe(0xff);
+    expect(buf[1]).toBe(0xd8);
+    expect(buf[2]).toBe(0xff);
+  });
 });
 
 // ── ICO file signature ───────────────────────────────────────────────
@@ -110,7 +120,7 @@ describe("index.html Open Graph meta tags", () => {
   it("has og:image with absolute URL", () => {
     const match = html.match(/<meta property="og:image" content="([^"]+)"/);
     expect(match).not.toBeNull();
-    expect(match[1]).toMatch(/^https:\/\/.+\/og-image\.png$/);
+    expect(match[1]).toMatch(/^https:\/\/.+\/og-image\.jpg$/);
   });
 
   it("has og:image:width", () => {
@@ -143,7 +153,7 @@ describe("index.html Twitter Card meta tags", () => {
   it("has twitter:image with absolute URL", () => {
     const match = html.match(/<meta name="twitter:image" content="([^"]+)"/);
     expect(match).not.toBeNull();
-    expect(match[1]).toMatch(/^https:\/\/.+\/og-image\.png$/);
+    expect(match[1]).toMatch(/^https:\/\/.+\/og-image\.jpg$/);
   });
 });
 
