@@ -256,7 +256,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: enableSharing ? '/app/data/reports' : ':memory:'
             }
           ],
-          !empty(customDomain) ? [
+          !empty(customDomain) && customDomainCertReady ? [
             {
               name: 'CUSTOM_DOMAIN'
               value: customDomain
