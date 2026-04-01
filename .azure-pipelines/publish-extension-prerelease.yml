@@ -34,6 +34,7 @@ extends:
     ghCreateTag: true
     standardizedVersioning: true
     nodeVersion: 22.x
+    workingDirectory: $(Build.SourcesDirectory)/vscode-extension
 
     buildSteps:
       - task: NodeTool@0
