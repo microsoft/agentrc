@@ -28,6 +28,7 @@ extends:
     publishExtension: ${{ parameters.publishExtension }}
     generateNotice: ${{ parameters.generateNotice }}
     nodeVersion: 22.x
+    workingDirectory: $(Build.SourcesDirectory)/vscode-extension
 
     buildSteps:
       - task: NodeTool@0
