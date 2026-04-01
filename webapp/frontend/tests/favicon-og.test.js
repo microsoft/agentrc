@@ -114,13 +114,13 @@ describe("index.html Open Graph meta tags", () => {
   });
 
   it("has og:url", () => {
-    expect(html).toMatch(/<meta property="og:url" content="https:\/\/.+"/);
+    expect(html).toMatch(/<meta property="og:url" content="(https:\/\/.+|%SITE_URL%)"/);
   });
 
   it("has og:image with absolute URL", () => {
     const match = html.match(/<meta property="og:image" content="([^"]+)"/);
     expect(match).not.toBeNull();
-    expect(match[1]).toMatch(/^https:\/\/.+\/og-image\.jpg$/);
+    expect(match[1]).toMatch(/^(https:\/\/.+|%SITE_URL%)\/assets\/og-image\.jpg$/);
   });
 
   it("has og:image:width", () => {
@@ -153,7 +153,7 @@ describe("index.html Twitter Card meta tags", () => {
   it("has twitter:image with absolute URL", () => {
     const match = html.match(/<meta name="twitter:image" content="([^"]+)"/);
     expect(match).not.toBeNull();
-    expect(match[1]).toMatch(/^https:\/\/.+\/og-image\.jpg$/);
+    expect(match[1]).toMatch(/^(https:\/\/.+|%SITE_URL%)\/assets\/og-image\.jpg$/);
   });
 });
 
