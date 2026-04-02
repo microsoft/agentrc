@@ -51,9 +51,23 @@ Both should produce identical results for the same repository because they share
 
 ## Step-by-Step Procedure
 
-### Phase 0: Start Local Webapp
+### Phase 0: Sync & Start Local Webapp
 
-1. Start the webapp backend dev server (from the repo root):
+1. Pull the latest changes from upstream to ensure you're working against the current source of truth:
+
+   ```
+   git fetch upstream && git merge upstream/main
+   ```
+
+   If the workspace uses a different default branch or remote name, adjust accordingly. Resolve any merge conflicts before proceeding.
+
+2. Install dependencies in case they changed:
+
+   ```
+   npm install
+   ```
+
+3. Start the webapp backend dev server (from the repo root):
 
    ```
    cd webapp/backend && npm run dev
@@ -61,14 +75,14 @@ Both should produce identical results for the same repository because they share
 
    This starts the Express server at `http://localhost:3000` with the local `@agentrc/core` source.
 
-2. Optionally serve the frontend for full visual testing:
+4. Optionally serve the frontend for full visual testing:
    ```
    cd webapp/frontend && npx vite --port 5173
    ```
 
 ### Phase 1: Generate Both Reports
 
-3. Run the CLI against the target repo to produce the visual HTML report:
+5. Run the CLI against the target repo to produce the visual HTML report:
 
    ```
    npm run dev -- readiness --visual --repo {owner}/{repo}
@@ -76,7 +90,7 @@ Both should produce identical results for the same repository because they share
 
    Save the output HTML (typically `readiness-report.html`).
 
-4. Hit the local webapp API to get the raw JSON:
+6. Hit the local webapp API to get the raw JSON:
 
    ```
    POST http://localhost:3000/api/scan
@@ -89,13 +103,13 @@ Both should produce identical results for the same repository because they share
    $response = Invoke-RestMethod -Uri "http://localhost:3000/api/scan" -Method POST -ContentType "application/json" -Body '{"repo_url":"https://github.com/{owner}/{repo}"}' -TimeoutSec 120
    ```
 
-5. Also open the local webapp page for visual comparison: `http://localhost:5173/{owner}/{repo}` (if frontend dev server is running) or `http://localhost:3000/{owner}/{repo}` (if backend serves static files).
+7. Also open the local webapp page for visual comparison: `http://localhost:5173/{owner}/{repo}` (if frontend dev server is running) or `http://localhost:3000/{owner}/{repo}` (if backend serves static files).
 
 ### Phase 2: Compare Data Layer
 
-6. Extract from CLI HTML: total checks, per-pillar passed/total, AI hero passed/total/percentage, criteria list with statuses, achieved level, fix-first items.
+8. Extract from CLI HTML: total checks, per-pillar passed/total, AI hero passed/total/percentage, criteria list with statuses, achieved level, fix-first items.
 
-7. Extract from webapp JSON: same fields. Use:
+9. Extract from webapp JSON: same fields. Use:
 
    ```powershell
    $pillars = $response.pillars
@@ -105,48 +119,50 @@ Both should produce identical results for the same repository because they share
    Write-Host "Criteria count: $($response.criteria.Count)"
    ```
 
-8. Diff the two — check for:
-   - **Missing criteria** in either side (criteria list length mismatch)
-   - **Status mismatches** for the same criterion ID
-   - **Total check count** differences (pillar aggregation)
-   - **AI Tooling hero** percentage/label differences
-   - **Achieved level** and next-level calculation differences
-   - **Fix-first** list ordering differences
+10. Diff the two — check for:
+
+- **Missing criteria** in either side (criteria list length mismatch)
+- **Status mismatches** for the same criterion ID
+- **Total check count** differences (pillar aggregation)
+- **AI Tooling hero** percentage/label differences
+- **Achieved level** and next-level calculation differences
+- **Fix-first** list ordering differences
 
 ### Phase 3: Compare Rendering Layer
 
-9. Compare how both renderers handle:
-   - Skipped checks display (icon, text, inclusion in totals)
-   - Bonus/extras section presence
-   - Pillar grouping (repo-health vs ai-setup)
-   - AI criterion icons for new/unknown IDs
-   - Score thresholds for labels (Excellent/Good/Fair/Getting Started/Not Started)
+11. Compare how both renderers handle:
+
+- Skipped checks display (icon, text, inclusion in totals)
+- Bonus/extras section presence
+- Pillar grouping (repo-health vs ai-setup)
+- AI criterion icons for new/unknown IDs
+- Score thresholds for labels (Excellent/Good/Fair/Getting Started/Not Started)
 
 ### Phase 4: Root Cause & Fix
 
 > **Reminder**: The CLI and `packages/core/` are the source of truth. All fixes go in `webapp/` only.
 
-10. For each difference found, classify as:
+12. For each difference found, classify as:
     - **Rendering divergence** → Fix in `webapp/frontend/src/report.js` to match CLI behavior
     - **Scoring logic divergence** → Fix in `webapp/backend/` or `webapp/frontend/` to align with core's scoring
     - **Icon/label mapping gap** → Update the icon/label map in `webapp/frontend/src/report.js`
 
-11. Implement the fixes directly in the `webapp/` source files. **Never edit** files in `packages/core/`, `src/`, or any other directory outside `webapp/`.
+13. Implement the fixes directly in the `webapp/` source files. **Never edit** files in `packages/core/`, `src/`, or any other directory outside `webapp/`.
 
-12. After fixing, restart the webapp dev server and re-run Phase 1-2 to verify alignment.
+14. After fixing, restart the webapp dev server and re-run Phase 1-2 to verify alignment.
 
 ### Phase 5: Validate
 
-13. Confirm both reports show identical:
+15. Confirm both reports show identical:
     - Total check count (e.g., "11 of 20")
     - Per-pillar passed/total
     - AI Tooling hero percentage and label
     - Achieved maturity level
     - Fix-first items (same set, same order)
 
-14. Note any **acceptable differences** that are by-design (e.g., webapp shows bonus checks, CLI doesn't).
+16. Note any **acceptable differences** that are by-design (e.g., webapp shows bonus checks, CLI doesn't).
 
-15. Run existing tests to ensure no regressions:
+17. Run existing tests to ensure no regressions:
     ```
     npm test
     cd webapp/backend && npm test
