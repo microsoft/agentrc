@@ -4,8 +4,21 @@ import path from "path";
 
 import type { ExtraDefinition, PolicyConfig } from "@agentrc/core/services/policy";
 import { loadPolicy, resolveChain, parsePolicySources } from "@agentrc/core/services/policy";
+import { isNativePlugin } from "@agentrc/core/services/policy/types";
 import type { ReadinessCriterion } from "@agentrc/core/services/readiness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+/** Helper: load a policy and assert it is a PolicyConfig (not a native plugin). */
+async function loadPolicyConfig(
+  source: string,
+  options?: { jsonOnly?: boolean }
+): Promise<PolicyConfig> {
+  const result = await loadPolicy(source, options);
+  if (isNativePlugin(result)) {
+    throw new Error(`Expected PolicyConfig but got native PolicyPlugin from "${source}"`);
+  }
+  return result;
+}
 
 // ─── Helpers ───
 
@@ -240,14 +253,14 @@ describe("loadPolicy", () => {
       thresholds: { passRate: 0.9 }
     });
 
-    const config = await loadPolicy(filePath);
+    const config = await loadPolicyConfig(filePath);
     expect(config.name).toBe("my-policy");
     expect(config.thresholds?.passRate).toBe(0.9);
   });
 
   it("loads a minimal JSON policy (name only)", async () => {
     const filePath = await writePolicy("minimal.json", { name: "minimal" });
-    const config = await loadPolicy(filePath);
+    const config = await loadPolicyConfig(filePath);
     expect(config.name).toBe("minimal");
   });
 
@@ -257,7 +270,7 @@ describe("loadPolicy", () => {
       criteria: { disable: ["lint-config", "readme"] }
     });
 
-    const config = await loadPolicy(filePath);
+    const config = await loadPolicyConfig(filePath);
     expect(config.criteria?.disable).toEqual(["lint-config", "readme"]);
   });
 
@@ -383,7 +396,7 @@ describe("loadPolicy", () => {
   it("loads JSON policy via absolute path", async () => {
     const filePath = path.join(tmpDir, "abs-policy.json");
     await fs.writeFile(filePath, JSON.stringify({ name: "absolute" }), "utf8");
-    const config = await loadPolicy(filePath);
+    const config = await loadPolicyConfig(filePath);
     expect(config.name).toBe("absolute");
   });
 
@@ -419,7 +432,7 @@ describe("loadPolicy", () => {
         }
       }
     });
-    const config = await loadPolicy(filePath);
+    const config = await loadPolicyConfig(filePath);
     expect(config.criteria?.override?.a).toEqual({
       title: "New",
       pillar: "testing",
@@ -433,7 +446,7 @@ describe("loadPolicy", () => {
   it("loads a .mjs module policy", async () => {
     const filePath = path.join(tmpDir, "mod-policy.mjs");
     await fs.writeFile(filePath, `export default { name: "mjs-policy", criteria: {} };\n`, "utf8");
-    const config = await loadPolicy(filePath);
+    const config = await loadPolicyConfig(filePath);
     expect(config.name).toBe("mjs-policy");
   });
 });
@@ -454,7 +467,7 @@ describe("loadPolicy jsonOnly", () => {
   it("allows JSON policies when jsonOnly is true", async () => {
     const filePath = path.join(tmpDir, "ok.json");
     await fs.writeFile(filePath, JSON.stringify({ name: "ok" }), "utf8");
-    const config = await loadPolicy(filePath, { jsonOnly: true });
+    const config = await loadPolicyConfig(filePath, { jsonOnly: true });
     expect(config.name).toBe("ok");
   });
 

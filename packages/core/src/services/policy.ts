@@ -3,6 +3,8 @@ import path from "path";
 
 import { readJson, stripJsonComments } from "../utils/fs";
 
+import type { PolicyPlugin } from "./policy/types";
+import { isNativePlugin, validateNativePlugin } from "./policy/types";
 import type { ReadinessCriterion, ReadinessContext } from "./readiness";
 
 // ─── Policy configuration types ───
@@ -158,10 +160,17 @@ export function parsePolicySources(raw: string | undefined): string[] | undefine
 
 // ─── Loading ───
 
+/**
+ * Load a policy from a file path or npm specifier.
+ *
+ * Returns either a PolicyConfig (for traditional criteria-based policies)
+ * or a PolicyPlugin (for native plugins that export the full plugin contract).
+ * Native plugins are detected by the presence of a `meta` property.
+ */
 export async function loadPolicy(
   source: string,
   options?: { jsonOnly?: boolean }
-): Promise<PolicyConfig> {
+): Promise<PolicyConfig | PolicyPlugin> {
   const jsonOnly = options?.jsonOnly ?? false;
 
   // Local file path (relative or absolute)
@@ -184,6 +193,12 @@ export async function loadPolicy(
       try {
         const mod = (await import(resolved)) as Record<string, unknown>;
         const config = (mod.default ?? mod) as unknown;
+        // Native PolicyPlugin exports have a `meta` property instead of a root-level `name`.
+        // Detect and return them directly without PolicyConfig validation.
+        if (isNativePlugin(config)) {
+          validateNativePlugin(config, source);
+          return config;
+        }
         return validatePolicyConfig(config, source);
       } catch (err) {
         if (
@@ -216,6 +231,11 @@ export async function loadPolicy(
   try {
     const mod = (await import(source)) as Record<string, unknown>;
     const config = (mod.default ?? mod) as unknown;
+    // Native PolicyPlugin exports from npm packages
+    if (isNativePlugin(config)) {
+      validateNativePlugin(config, source);
+      return config;
+    }
     return validatePolicyConfig(config, source);
   } catch (err) {
     const message =

@@ -7,6 +7,7 @@ import { loadPolicy, resolveChain } from "../policy";
 import { executePlugins } from "../policy/engine";
 import { loadPluginChain } from "../policy/loader";
 import type { PolicyContext } from "../policy/types";
+import { isNativePlugin } from "../policy/types";
 
 import { parseVscodeLocations } from "./checkers";
 import { buildCriteria } from "./criteria";
@@ -91,7 +92,16 @@ export async function runReadinessReport(options: ReadinessOptions): Promise<Rea
   if (policySources?.length) {
     const policyConfigs: PolicyConfig[] = [];
     for (const source of policySources) {
-      policyConfigs.push(await loadPolicy(source, { jsonOnly: isConfigSourced }));
+      const loaded = await loadPolicy(source, { jsonOnly: isConfigSourced });
+      // Native PolicyPlugin exports require the engine path (loadPluginChain + executePlugins).
+      // The legacy resolveChain path only supports PolicyConfig objects.
+      if (isNativePlugin(loaded)) {
+        throw new Error(
+          `Policy "${source}" exports a native PolicyPlugin and cannot be used with the legacy criteria path. ` +
+            `Native plugins are supported through the plugin engine — this is an internal error.`
+        );
+      }
+      policyConfigs.push(loaded);
     }
     const resolved = resolveChain(baseCriteria, baseExtras, policyConfigs);
     resolvedCriteria = resolved.criteria;

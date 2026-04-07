@@ -157,6 +157,47 @@ export type PolicyPlugin = {
   onError?: (error: Error, stage: PluginStage, ctx: PolicyContext) => boolean;
 };
 
+// ─── Type guards ───
+
+/**
+ * Detect whether a loaded module export is a native PolicyPlugin.
+ *
+ * Native plugins export a `PolicyPlugin` object directly (with a `meta` property)
+ * instead of a `PolicyConfig` object (which has a top-level `name` string).
+ * This allows module authors to use the full plugin lifecycle API
+ * (afterDetect, beforeRecommend, afterRecommend hooks with SignalPatch/RecommendationPatch)
+ * rather than being limited to the criteria.add/disable/override DSL.
+ */
+export function isNativePlugin(obj: unknown): obj is PolicyPlugin {
+  if (typeof obj !== "object" || obj === null) return false;
+  const record = obj as Record<string, unknown>;
+  if (typeof record.meta !== "object" || record.meta === null) return false;
+  const meta = record.meta as Record<string, unknown>;
+  return typeof meta.name === "string" && meta.name.trim().length > 0;
+}
+
+/**
+ * Validate that a native plugin export has the minimum required structure.
+ * Throws descriptive errors for invalid plugins.
+ */
+export function validateNativePlugin(obj: PolicyPlugin, source: string): void {
+  const { meta } = obj;
+  if (!meta.name?.trim()) {
+    throw new Error(`Native plugin "${source}" is invalid: meta.name is required`);
+  }
+  const hasHooks =
+    obj.detectors?.length ||
+    obj.afterDetect ||
+    obj.beforeRecommend ||
+    obj.recommenders?.length ||
+    obj.afterRecommend;
+  if (!hasHooks) {
+    throw new Error(
+      `Native plugin "${source}" is invalid: must implement at least one hook (detectors, afterDetect, beforeRecommend, recommenders, or afterRecommend)`
+    );
+  }
+}
+
 // ─── Engine output ───
 
 /** Grade label for a readiness score. */
