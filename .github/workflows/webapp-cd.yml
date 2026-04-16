@@ -32,7 +32,7 @@ jobs:
       image-tag: ${{ steps.meta.outputs.version }}
       image-full: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -66,7 +66,7 @@ jobs:
       security-events: write
       packages: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -91,7 +91,7 @@ jobs:
     needs: [build-push, security-scan]
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
