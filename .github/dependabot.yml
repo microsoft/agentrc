@@ -23,3 +23,8 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # lock.yml files are managed by 'gh aw compile' — Dependabot must not
+      # update gh-aw action pins directly.
+      - dependency-name: "github/gh-aw-actions/*"
+      - dependency-name: "github/gh-aw/*"
