@@ -26,5 +26,5 @@ updates:
     ignore:
       # lock.yml files are managed by 'gh aw compile' — Dependabot must not
       # update gh-aw action pins directly.
-      - dependency-name: "github/gh-aw"
-      - dependency-name: "github/gh-aw-actions"
+      - dependency-name: "github/gh-aw-actions/*"
+      - dependency-name: "github/gh-aw/*"
