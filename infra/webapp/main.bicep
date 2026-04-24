@@ -26,8 +26,14 @@ param ghTokenForScan string = ''
 @allowed(['scale-to-zero', 'keep-warm'])
 param containerStartupStrategy string = 'keep-warm'
 
-@description('Custom domain (optional, leave empty to skip)')
+@description('Custom domain (optional, leave empty to skip). Requires DNS to be configured first — see outputs.')
 param customDomain string = ''
+
+@description('Set to true only after DNS records (CNAME + TXT) are verified. First deploy with false to get verification ID.')
+param customDomainCertReady bool = false
+
+@description('Use ACR admin credentials instead of managed identity (set to true when the deploying SP lacks role-assignment write permissions)')
+param useAcrAdminCredentials bool = false
 
 @description('Tags for all resources')
 param tags object = {}
@@ -102,6 +108,13 @@ resource fileShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2023-0
   }
 }
 
+// ===== User-Assigned Managed Identity (for ACR pull) =====
+resource acrPullIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: '${namePrefix}-acr-pull'
+  location: location
+  tags: tags
+}
+
 // ===== Azure Container Registry =====
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: take(toLower(replace('${namePrefix}webapp', '-', '')), 50)
@@ -111,7 +124,7 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
     name: 'Basic'
   }
   properties: {
-    adminUserEnabled: false
+    adminUserEnabled: useAcrAdminCredentials
   }
 }
 
@@ -129,15 +142,27 @@ resource envStorage 'Microsoft.App/managedEnvironments/storages@2024-03-01' = if
   }
 }
 
-// ===== AcrPull Role Assignment (system-assigned managed identity) =====
+// ===== Managed Certificate for Custom Domain =====
+resource managedCert 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' = if (!empty(customDomain) && customDomainCertReady) {
+  parent: containerAppsEnv
+  name: 'cert-${replace(customDomain, '.', '-')}'
+  location: location
+  tags: tags
+  properties: {
+    subjectName: customDomain
+    domainControlValidation: 'CNAME'
+  }
+}
+
+// ===== AcrPull Role Assignment (user-assigned managed identity) =====
 @description('AcrPull built-in role')
 var acrPullRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
 
-resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(acr.id, containerApp.id, acrPullRoleId)
+resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!useAcrAdminCredentials) {
+  name: guid(acr.id, acrPullIdentity.id, acrPullRoleId)
   scope: acr
   properties: {
-    principalId: containerApp.identity.principalId
+    principalId: acrPullIdentity.properties.principalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: acrPullRoleId
   }
@@ -148,7 +173,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   location: location
   tags: tags
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${acrPullIdentity.id}': {}
+    }
   }
   properties: {
     managedEnvironmentId: containerAppsEnv.id
@@ -161,18 +189,32 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         customDomains: !empty(customDomain) ? [
           {
             name: customDomain
-            bindingType: 'SniEnabled'
+            bindingType: customDomainCertReady ? 'SniEnabled' : 'Disabled'
+            ...(customDomainCertReady ? {
+              certificateId: managedCert.id
+            } : {})
           }
         ] : []
       }
-      registries: [
+      registries: useAcrAdminCredentials ? [
         {
           server: acr.properties.loginServer
-          identity: 'system'
+          username: acr.listCredentials().username
+          passwordSecretRef: 'acr-password'
+        }
+      ] : [
+        {
+          server: acr.properties.loginServer
+          identity: acrPullIdentity.id
         }
       ]
       secrets: concat(
-        [],
+        useAcrAdminCredentials ? [
+          {
+            name: 'acr-password'
+            value: acr.listCredentials().passwords[0].value
+          }
+        ] : [],
         !empty(ghTokenForScan) ? [
           {
             name: 'gh-token-for-scan'
@@ -214,6 +256,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: enableSharing ? '/app/data/reports' : ':memory:'
             }
           ],
+          !empty(customDomain) && customDomainCertReady ? [
+            {
+              name: 'CUSTOM_DOMAIN'
+              value: customDomain
+            }
+          ] : [],
           !empty(ghTokenForScan) ? [
             {
               name: 'GH_TOKEN_FOR_SCAN'
@@ -277,7 +325,9 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       }
     }
   }
-  dependsOn: enableSharing ? [envStorage] : []
+  dependsOn: enableSharing
+    ? (useAcrAdminCredentials ? [envStorage] : [acrPullRoleAssignment, envStorage])
+    : (useAcrAdminCredentials ? [] : [acrPullRoleAssignment])
 }
 
 // ===== Outputs =====
@@ -295,3 +345,6 @@ output appInsightsConnectionString string = enableAppInsights ? appInsights!.pro
 
 @description('Log Analytics Workspace ID')
 output logAnalyticsWorkspaceId string = logAnalytics.id
+
+@description('Custom domain verification ID (use as TXT record value for asuid.{subdomain})')
+output domainVerificationId string = containerAppsEnv.properties.customDomainConfiguration.customDomainVerificationId
