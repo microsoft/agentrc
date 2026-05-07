@@ -91,7 +91,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22]
+        node: [22]
         os: [ubuntu-latest]
         include:
           - node: 22
