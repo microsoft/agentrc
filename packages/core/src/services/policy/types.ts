@@ -157,6 +157,127 @@ export type PolicyPlugin = {
   onError?: (error: Error, stage: PluginStage, ctx: PolicyContext) => boolean;
 };
 
+// ─── Type guards ───
+
+/**
+ * Detect whether a loaded module export is a native PolicyPlugin.
+ *
+ * Detection rules:
+ * 1. Must have a `meta` object with a non-empty `meta.name` string
+ * 2. Must NOT have a root-level `name` string (which would indicate a PolicyConfig)
+ * 3. If `meta.sourceType` or `meta.trust` are provided, they must be valid values
+ *
+ * Note: This is a detection heuristic, not a full validation. The loader normalises
+ * `meta.sourceType` and `meta.trust` after detection (overriding with "module" and
+ * "trusted-code"), so these fields are optional in the module export.
+ * Use `validateNativePlugin()` after detection to verify the plugin has valid hooks.
+ */
+export function isNativePlugin(obj: unknown): obj is PolicyPlugin {
+  if (typeof obj !== "object" || obj === null) return false;
+  const record = obj as Record<string, unknown>;
+  if (typeof record.meta !== "object" || record.meta === null) return false;
+  if (typeof record.name === "string") return false;
+  const meta = record.meta as Record<string, unknown>;
+  if (typeof meta.name !== "string" || meta.name.trim().length === 0) return false;
+  // Reject if meta fields are present but invalid
+  if (
+    meta.sourceType !== undefined &&
+    !["module", "json", "builtin"].includes(meta.sourceType as string)
+  )
+    return false;
+  if (
+    meta.trust !== undefined &&
+    !["trusted-code", "safe-declarative"].includes(meta.trust as string)
+  )
+    return false;
+  return true;
+}
+
+/**
+ * Validate that a native plugin export has the minimum required structure.
+ * Checks that hooks are the correct types and that detector/recommender arrays
+ * contain objects with the expected callable members.
+ * Throws descriptive errors for invalid plugins so issues are caught at load time.
+ */
+export function validateNativePlugin(obj: PolicyPlugin, source: string): void {
+  const { meta } = obj;
+  if (!meta.name?.trim()) {
+    throw new Error(`Native plugin "${source}" is invalid: meta.name is required`);
+  }
+
+  // Validate hook functions
+  if (obj.afterDetect !== undefined && typeof obj.afterDetect !== "function") {
+    throw new Error(`Native plugin "${source}" is invalid: afterDetect must be a function`);
+  }
+  if (obj.beforeRecommend !== undefined && typeof obj.beforeRecommend !== "function") {
+    throw new Error(`Native plugin "${source}" is invalid: beforeRecommend must be a function`);
+  }
+  if (obj.afterRecommend !== undefined && typeof obj.afterRecommend !== "function") {
+    throw new Error(`Native plugin "${source}" is invalid: afterRecommend must be a function`);
+  }
+  if (obj.onError !== undefined && typeof obj.onError !== "function") {
+    throw new Error(`Native plugin "${source}" is invalid: onError must be a function`);
+  }
+
+  // Validate detector array members
+  if (obj.detectors !== undefined) {
+    if (!Array.isArray(obj.detectors)) {
+      throw new Error(`Native plugin "${source}" is invalid: detectors must be an array`);
+    }
+    for (const [i, d] of obj.detectors.entries()) {
+      if (typeof d !== "object" || d === null) {
+        throw new Error(`Native plugin "${source}" is invalid: detectors[${i}] must be an object`);
+      }
+      if (typeof d.id !== "string" || !d.id.trim()) {
+        throw new Error(
+          `Native plugin "${source}" is invalid: detectors[${i}].id must be a non-empty string`
+        );
+      }
+      if (typeof d.detect !== "function") {
+        throw new Error(
+          `Native plugin "${source}" is invalid: detectors[${i}].detect must be a function`
+        );
+      }
+    }
+  }
+
+  // Validate recommender array members
+  if (obj.recommenders !== undefined) {
+    if (!Array.isArray(obj.recommenders)) {
+      throw new Error(`Native plugin "${source}" is invalid: recommenders must be an array`);
+    }
+    for (const [i, r] of obj.recommenders.entries()) {
+      if (typeof r !== "object" || r === null) {
+        throw new Error(
+          `Native plugin "${source}" is invalid: recommenders[${i}] must be an object`
+        );
+      }
+      if (typeof r.id !== "string" || !r.id.trim()) {
+        throw new Error(
+          `Native plugin "${source}" is invalid: recommenders[${i}].id must be a non-empty string`
+        );
+      }
+      if (typeof r.recommend !== "function") {
+        throw new Error(
+          `Native plugin "${source}" is invalid: recommenders[${i}].recommend must be a function`
+        );
+      }
+    }
+  }
+
+  const hasHooks =
+    obj.detectors?.length ||
+    obj.afterDetect ||
+    obj.beforeRecommend ||
+    obj.recommenders?.length ||
+    obj.afterRecommend;
+  if (!hasHooks) {
+    throw new Error(
+      `Native plugin "${source}" is invalid: must implement at least one hook (detectors, afterDetect, beforeRecommend, recommenders, or afterRecommend)`
+    );
+  }
+}
+
 // ─── Engine output ───
 
 /** Grade label for a readiness score. */

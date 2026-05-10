@@ -20,6 +20,7 @@ import { compilePolicyConfig } from "./compiler";
 import type { CompilationResult } from "./compiler";
 import type { EngineOptions } from "./engine";
 import type { PolicyPlugin } from "./types";
+import { isNativePlugin } from "./types";
 
 export type LoadedChain = {
   plugins: PolicyPlugin[];
@@ -80,9 +81,26 @@ export async function loadPluginChain(
   let passRateThreshold = 0.8;
 
   for (const source of policySources) {
-    const policyConfig: PolicyConfig = await loadPolicy(source, {
+    const loaded = await loadPolicy(source, {
       jsonOnly: options?.jsonOnly
     });
+
+    // Native PolicyPlugin exports — use directly with trusted-code trust.
+    // These modules export the full plugin contract (detectors, hooks, recommenders)
+    // instead of the PolicyConfig DSL (criteria.add/disable/override).
+    if (isNativePlugin(loaded)) {
+      plugins.push({
+        ...loaded,
+        meta: {
+          ...loaded.meta,
+          sourceType: "module",
+          trust: "trusted-code"
+        }
+      });
+      continue;
+    }
+
+    const policyConfig: PolicyConfig = loaded;
 
     // Check if this is a module policy (imperative plugin) with code-level hooks
     if (isImperativePlugin(policyConfig)) {

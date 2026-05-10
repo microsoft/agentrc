@@ -19,7 +19,7 @@ export type {
   EngineReport,
   Grade
 } from "./types";
-export { calculateScore } from "./types";
+export { calculateScore, isNativePlugin, validateNativePlugin } from "./types";
 export { executePlugins } from "./engine";
 export type { EngineOptions } from "./engine";
 export { compilePolicyConfig } from "./compiler";

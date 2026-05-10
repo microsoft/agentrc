@@ -2,13 +2,16 @@ import type {
   Signal,
   Recommendation,
   SignalPatch,
-  RecommendationPatch
+  RecommendationPatch,
+  PolicyPlugin
 } from "@agentrc/core/services/policy/types";
 import {
   calculateScore,
   applySignalPatch,
   applyRecommendationPatch,
-  resolveSupersedes
+  resolveSupersedes,
+  isNativePlugin,
+  validateNativePlugin
 } from "@agentrc/core/services/policy/types";
 import { describe, expect, it } from "vitest";
 
@@ -413,5 +416,242 @@ describe("resolveSupersedes", () => {
     const result = resolveSupersedes(recs);
     expect(result).toHaveLength(1);
     expect(result[0].origin.modifiedBy).toBeUndefined();
+  });
+});
+
+// ─── isNativePlugin ───
+
+describe("isNativePlugin", () => {
+  it("returns true for an object with meta.name", () => {
+    const plugin: PolicyPlugin = {
+      meta: { name: "test-plugin", sourceType: "module", trust: "trusted-code" },
+      detectors: [
+        {
+          id: "d1",
+          kind: "file",
+          detect: async () => ({
+            id: "s1",
+            kind: "file" as const,
+            status: "detected" as const,
+            label: "S1",
+            origin: { addedBy: "test" }
+          })
+        }
+      ]
+    };
+    expect(isNativePlugin(plugin)).toBe(true);
+  });
+
+  it("returns false for a PolicyConfig object (has root-level name)", () => {
+    const config = { name: "my-policy", criteria: { disable: ["readme"] } };
+    expect(isNativePlugin(config)).toBe(false);
+  });
+
+  it("returns false for null", () => {
+    expect(isNativePlugin(null)).toBe(false);
+  });
+
+  it("returns false for undefined", () => {
+    expect(isNativePlugin(undefined)).toBe(false);
+  });
+
+  it("returns false for a string", () => {
+    expect(isNativePlugin("not a plugin")).toBe(false);
+  });
+
+  it("returns false for an object with meta but no meta.name", () => {
+    expect(isNativePlugin({ meta: { sourceType: "module" } })).toBe(false);
+  });
+
+  it("returns false for an object with meta.name that is empty", () => {
+    expect(isNativePlugin({ meta: { name: "  " } })).toBe(false);
+  });
+
+  it("returns false for an object with meta as a non-object", () => {
+    expect(isNativePlugin({ meta: "not-an-object" })).toBe(false);
+  });
+
+  it("returns false for an object with meta as null", () => {
+    expect(isNativePlugin({ meta: null })).toBe(false);
+  });
+
+  it("returns false for an object with invalid meta.sourceType", () => {
+    expect(isNativePlugin({ meta: { name: "test", sourceType: "invalid" } })).toBe(false);
+  });
+
+  it("returns false for an object with invalid meta.trust", () => {
+    expect(isNativePlugin({ meta: { name: "test", trust: "invalid" } })).toBe(false);
+  });
+
+  it("returns true when meta.sourceType and meta.trust are valid", () => {
+    expect(
+      isNativePlugin({ meta: { name: "test", sourceType: "module", trust: "trusted-code" } })
+    ).toBe(true);
+  });
+
+  it("returns true when meta.sourceType and meta.trust are omitted", () => {
+    expect(isNativePlugin({ meta: { name: "test" } })).toBe(true);
+  });
+});
+
+// ─── validateNativePlugin ───
+
+describe("validateNativePlugin", () => {
+  it("does not throw for a valid native plugin with detectors", () => {
+    const plugin: PolicyPlugin = {
+      meta: { name: "valid", sourceType: "module", trust: "trusted-code" },
+      detectors: [
+        {
+          id: "d1",
+          kind: "file",
+          detect: async () => ({
+            id: "s1",
+            kind: "file" as const,
+            status: "detected" as const,
+            label: "S1",
+            origin: { addedBy: "test" }
+          })
+        }
+      ]
+    };
+    expect(() => validateNativePlugin(plugin, "test.mjs")).not.toThrow();
+  });
+
+  it("does not throw for a valid native plugin with only afterDetect", () => {
+    const plugin: PolicyPlugin = {
+      meta: { name: "hook-only", sourceType: "module", trust: "trusted-code" },
+      afterDetect: async () => undefined
+    };
+    expect(() => validateNativePlugin(plugin, "hook.mjs")).not.toThrow();
+  });
+
+  it("does not throw for a valid native plugin with only afterRecommend", () => {
+    const plugin: PolicyPlugin = {
+      meta: { name: "rec-hook", sourceType: "module", trust: "trusted-code" },
+      afterRecommend: async () => undefined
+    };
+    expect(() => validateNativePlugin(plugin, "rec.mjs")).not.toThrow();
+  });
+
+  it("throws for a plugin with no hooks at all", () => {
+    const plugin: PolicyPlugin = {
+      meta: { name: "empty", sourceType: "module", trust: "trusted-code" }
+    };
+    expect(() => validateNativePlugin(plugin, "empty.mjs")).toThrow(
+      "must implement at least one hook"
+    );
+  });
+
+  it("throws for a plugin with empty meta.name", () => {
+    const plugin = {
+      meta: { name: "", sourceType: "module", trust: "trusted-code" },
+      afterDetect: async () => undefined
+    } as PolicyPlugin;
+    expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow("meta.name is required");
+  });
+
+  it("throws for a plugin with afterDetect that is not a function", () => {
+    const plugin = {
+      meta: { name: "bad", sourceType: "module", trust: "trusted-code" },
+      afterDetect: "not a function"
+    } as unknown as PolicyPlugin;
+    expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow("afterDetect must be a function");
+  });
+
+  it("throws for a plugin with beforeRecommend that is not a function", () => {
+    const plugin = {
+      meta: { name: "bad", sourceType: "module", trust: "trusted-code" },
+      beforeRecommend: 42
+    } as unknown as PolicyPlugin;
+    expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow(
+      "beforeRecommend must be a function"
+    );
+  });
+
+  it("throws for a plugin with afterRecommend that is not a function", () => {
+    const plugin = {
+      meta: { name: "bad", sourceType: "module", trust: "trusted-code" },
+      afterRecommend: {}
+    } as unknown as PolicyPlugin;
+    expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow(
+      "afterRecommend must be a function"
+    );
+  });
+
+  it("throws for a plugin with detectors that is not an array", () => {
+    const plugin = {
+      meta: { name: "bad", sourceType: "module", trust: "trusted-code" },
+      detectors: "not-an-array"
+    } as unknown as PolicyPlugin;
+    expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow("detectors must be an array");
+  });
+
+  it("throws for a detector entry that is null", () => {
+    const plugin = {
+      meta: { name: "bad", sourceType: "module", trust: "trusted-code" },
+      detectors: [null]
+    } as unknown as PolicyPlugin;
+    expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow("detectors[0] must be an object");
+  });
+
+  it("throws for a recommender entry that is a primitive", () => {
+    const plugin = {
+      meta: { name: "bad", sourceType: "module", trust: "trusted-code" },
+      recommenders: ["not-an-object"]
+    } as unknown as PolicyPlugin;
+    expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow(
+      "recommenders[0] must be an object"
+    );
+  });
+
+  it("throws for a detector missing an id", () => {
+    const plugin = {
+      meta: { name: "bad", sourceType: "module", trust: "trusted-code" },
+      detectors: [
+        {
+          kind: "file",
+          detect: async () => ({
+            id: "s",
+            kind: "file",
+            status: "detected",
+            label: "S",
+            origin: { addedBy: "t" }
+          })
+        }
+      ]
+    } as unknown as PolicyPlugin;
+    expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow(
+      "detectors[0].id must be a non-empty string"
+    );
+  });
+
+  it("throws for a detector with detect that is not a function", () => {
+    const plugin = {
+      meta: { name: "bad", sourceType: "module", trust: "trusted-code" },
+      detectors: [{ id: "d1", kind: "file", detect: "not-a-function" }]
+    } as unknown as PolicyPlugin;
+    expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow(
+      "detectors[0].detect must be a function"
+    );
+  });
+
+  it("throws for a recommender missing an id", () => {
+    const plugin = {
+      meta: { name: "bad", sourceType: "module", trust: "trusted-code" },
+      recommenders: [{ recommend: async () => [] }]
+    } as unknown as PolicyPlugin;
+    expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow(
+      "recommenders[0].id must be a non-empty string"
+    );
+  });
+
+  it("throws for a recommender with recommend that is not a function", () => {
+    const plugin = {
+      meta: { name: "bad", sourceType: "module", trust: "trusted-code" },
+      recommenders: [{ id: "r1", recommend: 42 }]
+    } as unknown as PolicyPlugin;
+    expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow(
+      "recommenders[0].recommend must be a function"
+    );
   });
 });
