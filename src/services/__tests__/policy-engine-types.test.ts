@@ -492,6 +492,15 @@ describe("isNativePlugin", () => {
   it("returns true when meta.sourceType and meta.trust are omitted", () => {
     expect(isNativePlugin({ meta: { name: "test" } })).toBe(true);
   });
+
+  it("returns false for an object with both root-level name and meta (ambiguous)", () => {
+    expect(
+      isNativePlugin({
+        name: "config-name",
+        meta: { name: "plugin-name", sourceType: "module", trust: "trusted-code" }
+      })
+    ).toBe(false);
+  });
 });
 
 // ─── validateNativePlugin ───
@@ -653,5 +662,14 @@ describe("validateNativePlugin", () => {
     expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow(
       "recommenders[0].recommend must be a function"
     );
+  });
+
+  it("throws for a plugin with onError that is not a function", () => {
+    const plugin = {
+      meta: { name: "bad", sourceType: "module", trust: "trusted-code" },
+      onError: "not a function",
+      afterDetect: async () => undefined
+    } as unknown as PolicyPlugin;
+    expect(() => validateNativePlugin(plugin, "bad.mjs")).toThrow("onError must be a function");
   });
 });

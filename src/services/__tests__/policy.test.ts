@@ -4,6 +4,7 @@ import path from "path";
 
 import type { ExtraDefinition, PolicyConfig } from "@agentrc/core/services/policy";
 import { loadPolicy, resolveChain, parsePolicySources } from "@agentrc/core/services/policy";
+import type { PolicyPlugin } from "@agentrc/core/services/policy/types";
 import { isNativePlugin } from "@agentrc/core/services/policy/types";
 import type { ReadinessCriterion } from "@agentrc/core/services/readiness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -448,6 +449,24 @@ describe("loadPolicy", () => {
     await fs.writeFile(filePath, `export default { name: "mjs-policy", criteria: {} };\n`, "utf8");
     const config = await loadPolicyConfig(filePath);
     expect(config.name).toBe("mjs-policy");
+  });
+
+  it("loads a native PolicyPlugin export from a .mjs file", async () => {
+    const filePath = path.join(tmpDir, "native-plugin.mjs");
+    await fs.writeFile(
+      filePath,
+      `export default {
+        meta: { name: "direct-native" },
+        afterDetect: async () => undefined
+      };\n`,
+      "utf8"
+    );
+    const result = await loadPolicy(filePath);
+    expect(isNativePlugin(result)).toBe(true);
+    const plugin = result as PolicyPlugin;
+    expect(plugin.meta.name).toBe("direct-native");
+    expect(plugin.meta.sourceType).toBe("module");
+    expect(plugin.meta.trust).toBe("trusted-code");
   });
 });
 

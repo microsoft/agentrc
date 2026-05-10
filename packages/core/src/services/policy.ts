@@ -163,16 +163,17 @@ export function parsePolicySources(raw: string | undefined): string[] | undefine
 
 /**
  * Normalize a native plugin export to ensure `meta.sourceType` and `meta.trust`
- * are populated. Plugin authors may omit these fields; we default them here
- * so the returned object satisfies the full `PolicyPlugin` type contract.
+ * are set correctly. Module-loaded plugins are always `sourceType: "module"` and
+ * `trust: "trusted-code"` regardless of what the export declares — a module
+ * cannot claim to be "builtin" or "safe-declarative".
  */
 function normalizeNativePlugin(plugin: PolicyPlugin): PolicyPlugin {
   return {
     ...plugin,
     meta: {
       ...plugin.meta,
-      sourceType: plugin.meta.sourceType ?? "module",
-      trust: plugin.meta.trust ?? "trusted-code"
+      sourceType: "module",
+      trust: "trusted-code"
     }
   };
 }
@@ -186,9 +187,8 @@ function normalizeNativePlugin(plugin: PolicyPlugin): PolicyPlugin {
  * object with a non-empty `meta.name` string, and must NOT have a root-level
  * `name` string (which would indicate a PolicyConfig).
  *
- * Native plugin exports may omit `meta.sourceType` and `meta.trust`;
- * they are normalised to "module" and "trusted-code" before returning.
- * Callers should not access these fields on the raw return value.
+ * Native plugin exports are normalised with `sourceType: "module"` and
+ * `trust: "trusted-code"` regardless of what the export declares.
  */
 export async function loadPolicy(
   source: string,
