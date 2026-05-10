@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: raven-actions/actionlint@v2
         with:
-          flags: "-ignore SC2015 -ignore SC2086 -ignore 'string should not be empty'"
+          flags: '-ignore SC2015 -ignore SC2086 -ignore "string should not be empty"'
 
   lint:
     name: Lint & Format
