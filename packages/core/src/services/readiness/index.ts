@@ -89,15 +89,16 @@ export async function runReadinessReport(options: ReadinessOptions): Promise<Rea
   let passRateThreshold = 0.8;
   let policyInfo: { chain: string[]; criteriaCount: number } | undefined;
 
+  let shadow = options.shadow ?? false;
+
   if (policySources?.length) {
     const policyConfigs: PolicyConfig[] = [];
-    let hasNativePlugin = false;
     for (const source of policySources) {
       const loaded = await loadPolicy(source, { jsonOnly: isConfigSourced });
       // Native PolicyPlugin exports are handled by the engine path (loadPluginChain).
       // Skip them here — they'll be loaded by loadPluginChain below.
       if (isNativePlugin(loaded)) {
-        hasNativePlugin = true;
+        shadow = true;
         continue;
       }
       policyConfigs.push(loaded);
@@ -111,12 +112,6 @@ export async function runReadinessReport(options: ReadinessOptions): Promise<Rea
     } else {
       resolvedCriteria = baseCriteria;
       resolvedExtras = baseExtras;
-    }
-    // When native plugins are present, automatically enable the engine path
-    // so their detectors, hooks, and recommenders execute.
-    // Use a local copy to avoid mutating the caller's options object.
-    if (hasNativePlugin && !options.shadow) {
-      options = { ...options, shadow: true };
     }
   } else {
     resolvedCriteria = baseCriteria;
@@ -278,7 +273,7 @@ export async function runReadinessReport(options: ReadinessOptions): Promise<Rea
 
   // ── Plugin engine: run shadow comparison when opts.shadow is enabled ──
   let engine: ReadinessReport["engine"];
-  if (options.shadow) {
+  if (shadow) {
     const policyCtx: PolicyContext = {
       repoPath,
       rootFiles,

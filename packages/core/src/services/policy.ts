@@ -179,6 +179,15 @@ function normalizeNativePlugin(plugin: PolicyPlugin): PolicyPlugin {
 }
 
 /**
+ * Validate and normalize a module export that passed the isNativePlugin check.
+ * Throws if the plugin is structurally invalid; otherwise returns normalized form.
+ */
+function resolveNativePlugin(config: PolicyPlugin, source: string): PolicyPlugin {
+  validateNativePlugin(config, source);
+  return normalizeNativePlugin(config);
+}
+
+/**
  * Load a policy from a file path or npm specifier.
  *
  * Returns either a PolicyConfig (for traditional criteria-based policies)
@@ -219,11 +228,8 @@ export async function loadPolicy(
         // import() treats as a URL scheme (c:), causing ERR_UNSUPPORTED_ESM_URL_SCHEME.
         const mod = (await import(pathToFileURL(resolved).href)) as Record<string, unknown>;
         const config = (mod.default ?? mod) as unknown;
-        // Native PolicyPlugin exports have a `meta` property instead of a root-level `name`.
-        // Detect and return them directly without PolicyConfig validation.
         if (isNativePlugin(config)) {
-          validateNativePlugin(config, source);
-          return normalizeNativePlugin(config);
+          return resolveNativePlugin(config, source);
         }
         return validatePolicyConfig(config, source);
       } catch (err) {
@@ -259,8 +265,7 @@ export async function loadPolicy(
     const config = (mod.default ?? mod) as unknown;
     // Native PolicyPlugin exports from npm packages
     if (isNativePlugin(config)) {
-      validateNativePlugin(config, source);
-      return normalizeNativePlugin(config);
+      return resolveNativePlugin(config, source);
     }
     return validatePolicyConfig(config, source);
   } catch (err) {

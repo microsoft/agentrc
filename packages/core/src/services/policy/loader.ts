@@ -85,18 +85,10 @@ export async function loadPluginChain(
       jsonOnly: options?.jsonOnly
     });
 
-    // Native PolicyPlugin exports — use directly with trusted-code trust.
-    // These modules export the full plugin contract (detectors, hooks, recommenders)
-    // instead of the PolicyConfig DSL (criteria.add/disable/override).
+    // Native PolicyPlugin exports — already normalized by loadPolicy (sourceType: "module",
+    // trust: "trusted-code"). Add directly to the chain without reprocessing.
     if (isNativePlugin(loaded)) {
-      plugins.push({
-        ...loaded,
-        meta: {
-          ...loaded.meta,
-          sourceType: "module",
-          trust: "trusted-code"
-        }
-      });
+      plugins.push(loaded);
       continue;
     }
 
