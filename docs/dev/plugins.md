@@ -81,10 +81,11 @@ Circular supersedes chains drop all involved recommendations.
 
 ## Writing a Plugin
 
-There are two authoring APIs:
+There are three authoring APIs:
 
 - **`PolicyConfig`** — The high-level authoring API. You write a config object with `criteria`/`extras`/`thresholds` and the engine compiles it into a `PolicyPlugin` under the hood. This is the recommended approach for most use cases.
-- **`PolicyPlugin`** — The low-level hook-based API (shown in the Plugin Contract section above). Use this only when you need direct control over the 5-stage pipeline hooks.
+- **`PolicyPlugin` (native export)** — Export the full `PolicyPlugin` contract directly from a `.ts`/`.js`/`.mjs` module. Use this when you need direct control over the 5-stage pipeline hooks (signal mutation, cross-signal recommendations, rich recommendation metadata).
+- **JSON** — Static declarative policy for disabling/overriding criteria. Config-file sourced policies are restricted to JSON only for security.
 
 ### Imperative Plugin (TypeScript via PolicyConfig)
 
@@ -119,6 +120,86 @@ const policy: PolicyConfig = {
 
 export default policy;
 ```
+
+### Native Plugin (TypeScript via PolicyPlugin)
+
+Export a `PolicyPlugin` object directly when you need the full 5-stage pipeline. The loader detects native exports by looking for a `meta` property instead of a root-level `name` string, and unconditionally sets `meta.sourceType: "module"` and `meta.trust: "trusted-code"`.
+
+```typescript
+// my-native-plugin.mjs
+import type { PolicyPlugin } from "@agentrc/core/services/policy/types";
+
+const plugin: PolicyPlugin = {
+  meta: {
+    name: "my-native-plugin",
+    version: "1.0.0"
+  },
+
+  // Detectors emit signals about repository state
+  detectors: [
+    {
+      id: "my-signal",
+      label: "My Custom Signal",
+      detect: async (ctx) => {
+        const found = ctx.rootFiles.includes(".myconfig");
+        return {
+          status: found ? "detected" : "not-detected",
+          evidence: found ? [".myconfig present"] : [],
+          kind: "file"
+        };
+      }
+    }
+  ],
+
+  // afterDetect hook: mutate signals after all detectors run
+  afterDetect: async (signals, ctx) => {
+    // Example: add a synthetic signal based on detected state
+    return {
+      add: [],
+      remove: [],
+      modify: []
+    };
+  },
+
+  // Recommenders derive actionable items from signals
+  recommenders: [
+    {
+      id: "my-recommender",
+      recommend: async (signals, ctx) => {
+        const signal = signals.find((s) => s.id === "my-signal");
+        if (signal?.status === "not-detected") {
+          return [
+            {
+              id: "add-myconfig",
+              signalId: "my-signal",
+              impact: "medium",
+              message: "Add a .myconfig file to configure the tool",
+              origin: { addedBy: "my-native-plugin" }
+            }
+          ];
+        }
+        return [];
+      }
+    }
+  ]
+};
+
+export default plugin;
+```
+
+Use native plugin exports via `--policy`:
+
+```bash
+agentrc readiness --policy ./my-native-plugin.mjs
+```
+
+Or publish as an npm package and reference by package name:
+
+```bash
+agentrc readiness --policy @myorg/agentrc-policy-custom
+```
+
+> **Note:** Native plugin exports are only supported via `--policy` (CLI flag) or npm packages. Config-file sourced policies (`agentrc.config.json`) are restricted to JSON for security.
 
 ### Declarative Policy (JSON)
 

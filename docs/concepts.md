@@ -188,9 +188,13 @@ Policies let organizations customize the readiness scoring to match their standa
 - **Disable** criteria that don't apply to your stack
 - **Override** scoring metadata (impact, required level)
 - **Set thresholds** for pass rates
+- **Add custom detectors and hooks** via native plugin exports (TypeScript/JavaScript modules)
 
 ```bash
 agentrc readiness --policy ./policies/strict.json
+
+# TypeScript/JS module policies (supports native PolicyPlugin exports)
+agentrc readiness --policy ./policies/my-policy.ts
 ```
 
 AgentRC ships with example policies for common scenarios:
