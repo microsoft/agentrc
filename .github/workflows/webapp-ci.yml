@@ -61,7 +61,7 @@ jobs:
       - name: Build Docker image
         run: docker build -f Dockerfile.webapp -t agentrc-webapp:test .
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: agentrc-webapp:test
           format: sarif
