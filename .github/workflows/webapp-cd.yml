@@ -22,7 +22,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/agentrc-webapp
-  RESOURCE_GROUP: agentrc-webapp-rg
+  RESOURCE_GROUP: agentrc-webapp
   BICEP_FILE: infra/webapp/main.bicep
 
 jobs:
@@ -133,7 +133,7 @@ jobs:
             2>&1 || echo "Storage mount does not exist yet"
           sleep 10
 
-      - name: Deploy infrastructure
+      - name: Deploy infrastructure (step 1 — app + domain registration)
         uses: azure/arm-deploy@v2
         with:
           resourceGroupName: ${{ env.RESOURCE_GROUP }}
@@ -141,6 +141,22 @@ jobs:
           parameters: >
             containerImageTag=${{ needs.build-push.outputs.image-tag }}
             ghTokenForScan=${{ secrets.GH_TOKEN_FOR_SCAN }}
+            useAcrAdminCredentials=${{ vars.USE_ACR_ADMIN_CREDENTIALS == 'true' }}
+            customDomain=${{ vars.CUSTOM_DOMAIN || '' }}
+            customDomainCertReady=false
+
+      - name: Deploy infrastructure (step 2 — bind managed certificate)
+        if: vars.CUSTOM_DOMAIN && vars.CUSTOM_DOMAIN_CERT_READY == 'true'
+        uses: azure/arm-deploy@v2
+        with:
+          resourceGroupName: ${{ env.RESOURCE_GROUP }}
+          template: ${{ env.BICEP_FILE }}
+          parameters: >
+            containerImageTag=${{ needs.build-push.outputs.image-tag }}
+            ghTokenForScan=${{ secrets.GH_TOKEN_FOR_SCAN }}
+            useAcrAdminCredentials=${{ vars.USE_ACR_ADMIN_CREDENTIALS == 'true' }}
+            customDomain=${{ vars.CUSTOM_DOMAIN || '' }}
+            customDomainCertReady=true
 
       - name: Ensure image in ACR
         run: |
@@ -176,3 +192,10 @@ jobs:
           curl -sf "https://${APP_URL}/api/health" | grep -q '"ok"'
           curl -sf "https://${APP_URL}/" | grep -q "AgentRC"
           echo "Smoke tests passed!"
+
+          CUSTOM_DOMAIN="${{ vars.CUSTOM_DOMAIN }}"
+          if [ -n "$CUSTOM_DOMAIN" ] && [ "${{ vars.CUSTOM_DOMAIN_CERT_READY }}" = "true" ]; then
+            echo "Testing custom domain https://${CUSTOM_DOMAIN}"
+            curl -sf "https://${CUSTOM_DOMAIN}/api/health" | grep -q '"ok"'
+            echo "Custom domain smoke test passed!"
+          fi

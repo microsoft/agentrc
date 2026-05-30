@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512">
+  <defs>
+    <linearGradient id="frame-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+    
+    <linearGradient id="sparkle-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24" />
+      <stop offset="100%" stop-color="#ea580c" />
+    </linearGradient>
+
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="64" height="64" rx="16" fill="url(#bg-grad)" />
+
+  <g fill="none" stroke="url(#frame-grad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 10 24 V 16 Q 10 10 16 10 H 24" />
+    <path d="M 54 24 V 16 Q 54 10 48 10 H 40" />
+    <path d="M 54 40 V 48 Q 54 54 48 54 H 40" />
+    <path d="M 10 40 V 48 Q 10 54 16 54 H 24" />
+  </g>
+
+  <path d="M 32 21 Q 32 32 21 32 Q 32 32 32 43 Q 32 32 43 32 Q 32 32 32 21 Z" fill="url(#sparkle-grad)" />
+</svg>

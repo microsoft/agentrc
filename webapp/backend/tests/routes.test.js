@@ -48,13 +48,26 @@ function listen(app) {
   });
 }
 
+/** Gracefully close an HTTP server, resolving once the underlying handle is freed. */
+function closeServer(s) {
+  return new Promise((resolve, reject) => {
+    if (!s) return resolve();
+    s.close((err) => (err ? reject(err) : resolve()));
+  });
+}
+
 describe("API routes", () => {
   let app;
   let runtime;
   let base;
   let server;
+  const savedCustomDomain = process.env.CUSTOM_DOMAIN;
 
   beforeEach(async () => {
+    // Clear CUSTOM_DOMAIN so createRuntime()'s parseCustomDomain validation
+    // never throws due to host-environment values (e.g. "localhost").
+    delete process.env.CUSTOM_DOMAIN;
+
     runtime = {
       ...createRuntime(),
       githubToken: "",
@@ -75,7 +88,15 @@ describe("API routes", () => {
     ({ base, server } = await listen(app));
   });
 
-  afterEach(() => server?.close());
+  afterEach(async () => {
+    await closeServer(server);
+    // Restore original CUSTOM_DOMAIN so we don't leak state to other suites.
+    if (savedCustomDomain !== undefined) {
+      process.env.CUSTOM_DOMAIN = savedCustomDomain;
+    } else {
+      delete process.env.CUSTOM_DOMAIN;
+    }
+  });
 
   describe("GET /api/health", () => {
     it("returns ok status", async () => {
@@ -171,7 +192,7 @@ describe("API routes", () => {
     });
 
     it("returns 503 when sharing is disabled", async () => {
-      server?.close();
+      await closeServer(server);
       runtime.sharingEnabled = false;
       app = createApp(runtime);
       ({ base, server } = await listen(app));
@@ -218,6 +239,69 @@ describe("API routes", () => {
       expect(getRes.status).toBe(200);
       const getBody = await getRes.json();
       expect(getBody.achievedLevel).toBe(0);
+    });
+  });
+
+  describe("index.html templating (%SITE_URL% replacement)", () => {
+    it("replaces %SITE_URL% with runtime.siteUrl when CUSTOM_DOMAIN is configured", async () => {
+      await closeServer(server);
+      runtime.siteUrl = "https://app.example.com";
+      app = createApp(runtime);
+      ({ base, server } = await listen(app));
+
+      const res = await fetch(`${base}/`);
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain('content="https://app.example.com"');
+      expect(html).toContain('content="https://app.example.com/assets/og-image.jpg"');
+      expect(html).not.toContain("%SITE_URL%");
+    });
+
+    it("derives %SITE_URL% from the request host when siteUrl is empty", async () => {
+      await closeServer(server);
+      runtime.siteUrl = "";
+      app = createApp(runtime);
+      ({ base, server } = await listen(app));
+      // Align runtime.port with the actual ephemeral port so renderIndex
+      // produces a URL that matches the real server origin.
+      runtime.port = server.address().port;
+
+      const res = await fetch(`${base}/`);
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      // Should derive from localhost + the actual bound port
+      expect(html).toContain(`http://localhost:${runtime.port}`);
+      expect(html).not.toContain("%SITE_URL%");
+    });
+
+    it("replaces %SITE_URL% on SPA catch-all routes", async () => {
+      await closeServer(server);
+      runtime.siteUrl = "https://spa.example.com";
+      app = createApp(runtime);
+      ({ base, server } = await listen(app));
+
+      const res = await fetch(`${base}/some/spa/route`);
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain('content="https://spa.example.com"');
+      expect(html).toContain('content="https://spa.example.com/assets/og-image.jpg"');
+      expect(html).not.toContain("%SITE_URL%");
+    });
+
+    it("derives %SITE_URL% from request host on SPA catch-all when siteUrl is empty", async () => {
+      await closeServer(server);
+      runtime.siteUrl = "";
+      app = createApp(runtime);
+      ({ base, server } = await listen(app));
+      // Align runtime.port with the actual ephemeral port so renderIndex
+      // produces a URL that matches the real server origin.
+      runtime.port = server.address().port;
+
+      const res = await fetch(`${base}/report/abc`);
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain(`http://localhost:${runtime.port}`);
+      expect(html).not.toContain("%SITE_URL%");
     });
   });
 });
