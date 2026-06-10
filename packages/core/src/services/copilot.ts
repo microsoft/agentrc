@@ -15,17 +15,23 @@ export function logCopilotDebug(message: string): void {
 }
 
 /**
- * Parse a positive-integer environment variable.  Returns the parsed value
- * when the env var is set to a finite number > 0; otherwise returns
- * `undefined` so callers can apply their own default.  Emits a debug log
- * when the variable is set but unparseable, so users running with
- * `AGENTRC_DEBUG_COPILOT=1` can see when their override was rejected.
+ * Parse a positive-integer environment variable.  Accepts only a base-10
+ * integer literal (after trimming surrounding whitespace) so surprising
+ * inputs such as `"1.5"`, `"1e3"`, or `"0x10"` are rejected rather than
+ * silently coerced.  Returns the parsed value when it is an integer > 0;
+ * otherwise returns `undefined` so callers can apply their own default.
+ * Emits a debug log when the variable is set but rejected, so users running
+ * with `AGENTRC_DEBUG_COPILOT=1` can see when their override was ignored.
  */
 export function parsePositiveIntEnv(name: string): number | undefined {
   const raw = process.env[name];
-  if (raw === undefined || raw === "") return undefined;
-  const parsed = Number(raw);
-  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  if (raw === undefined) return undefined;
+  const trimmed = raw.trim();
+  if (trimmed === "") return undefined;
+  if (/^\d+$/u.test(trimmed)) {
+    const parsed = Number(trimmed);
+    if (Number.isSafeInteger(parsed) && parsed > 0) return parsed;
+  }
   logCopilotDebug(`ignoring invalid ${name}=${raw}`);
   return undefined;
 }
