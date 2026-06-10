@@ -60,7 +60,8 @@ const CLI_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
  * `.bat`-shim / Node cold start on Windows still routinely exceeds 5 s, so
  * the non-npx path uses 20 s.  Overridable via `AGENTRC_COPILOT_PROBE_TIMEOUT_MS`.
  *
- * Exported for unit testing of the selection logic.
+ * @internal Exported only for unit testing of the selection logic; not part of
+ * the public API and intentionally excluded from the `@agentrc/core` barrel.
  */
 export function getHeadlessProbeTimeoutMs(config: CopilotCliConfig): number {
   const override = parsePositiveIntEnv("AGENTRC_COPILOT_PROBE_TIMEOUT_MS");

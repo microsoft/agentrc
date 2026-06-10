@@ -351,6 +351,8 @@ export async function generateCopilotInstructions(
       skillDirectories: [rootSkillDir]
     });
 
+    const timeoutMs = getInstructionGenerationTimeoutMs();
+
     await trySetAutopilot(session);
 
     let content = "";
@@ -381,7 +383,7 @@ ${existingSection}`;
     progress("Analyzing codebase...");
     let sendError: unknown;
     try {
-      await session.sendAndWait({ prompt }, getInstructionGenerationTimeoutMs());
+      await session.sendAndWait({ prompt }, timeoutMs);
     } catch (err) {
       sendError = err;
     } finally {
@@ -452,6 +454,8 @@ export async function generateAreaInstructions(
       skillDirectories: [areaSkillDir]
     });
 
+    const timeoutMs = getInstructionGenerationTimeoutMs();
+
     await trySetAutopilot(session);
 
     let content = "";
@@ -484,7 +488,7 @@ ${existingSection ? `\nDo NOT duplicate content already covered by existing inst
     progress(`Analyzing area "${area.name}"...`);
     let sendError: unknown;
     try {
-      await session.sendAndWait({ prompt }, getInstructionGenerationTimeoutMs());
+      await session.sendAndWait({ prompt }, timeoutMs);
     } catch (err) {
       sendError = err;
     } finally {
@@ -712,6 +716,7 @@ async function generateNestedHub(
     area?: Area;
     childAreas?: Area[];
     model?: string;
+    timeoutMs: number;
     onProgress?: (message: string) => void;
   }
 ): Promise<HubResult> {
@@ -785,7 +790,7 @@ ${existingSection ? `\nDo NOT duplicate content from existing instruction files\
 
   let sendError: unknown;
   try {
-    await session.sendAndWait({ prompt }, getInstructionGenerationTimeoutMs());
+    await session.sendAndWait({ prompt }, options.timeoutMs);
   } catch (err) {
     sendError = err;
   } finally {
@@ -812,6 +817,7 @@ async function generateNestedDetail(
     topic: NestedTopic;
     area?: Area;
     model?: string;
+    timeoutMs: number;
     onProgress?: (message: string) => void;
   }
 ): Promise<string> {
@@ -869,7 +875,7 @@ Description: ${options.topic.description}`;
 
   let sendError: unknown;
   try {
-    await session.sendAndWait({ prompt }, getInstructionGenerationTimeoutMs());
+    await session.sendAndWait({ prompt }, options.timeoutMs);
   } catch (err) {
     sendError = err;
   } finally {
@@ -908,6 +914,8 @@ export async function generateNestedInstructions(
   progress("Starting Copilot SDK...");
   const client = await createCopilotClient(cliConfig);
 
+  const timeoutMs = getInstructionGenerationTimeoutMs();
+
   try {
     // Step 1: Generate hub
     const { hubContent, topics } = await generateNestedHub(client, {
@@ -916,6 +924,7 @@ export async function generateNestedInstructions(
       area: options.area,
       childAreas: options.childAreas,
       model: options.model,
+      timeoutMs,
       onProgress: options.onProgress
     });
 
@@ -944,6 +953,7 @@ export async function generateNestedInstructions(
           topic,
           area: options.area,
           model: options.model,
+          timeoutMs,
           onProgress: options.onProgress
         });
         if (detailContent) {
