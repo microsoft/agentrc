@@ -8,8 +8,8 @@ import { ensureDir, safeWriteFile } from "../utils/fs";
 
 import type { Area, InstructionStrategy } from "./analyzer";
 import { sanitizeAreaName } from "./analyzer";
-import { assertCopilotCliReady } from "./copilot";
-import { createCopilotClient, loadCopilotSdk } from "./copilotSdk";
+import { assertCopilotCliReady, parsePositiveIntEnv } from "./copilot";
+import { createCopilotClient, loadCopilotSdk, wirePermissionResponse } from "./copilotSdk";
 import type { FileAction } from "./generator";
 import { getSkillDirectory } from "./skills";
 
@@ -224,17 +224,27 @@ const INSTRUCTION_GENERATION_EXCLUDED_TOOLS = [
   "str_replace_editor"
 ];
 
+/**
+ * Upper bound for a single `session.sendAndWait` call during instruction
+ * generation.  Generation drives an agent loop with many tool calls and on
+ * slower endpoints or larger repos the total run can exceed the SDK's default
+ * 3-minute budget.  This is a ceiling, not an idle wait — fast runs complete
+ * well under a minute.  Overridable via `AGENTRC_INSTRUCTION_TIMEOUT_MS` for
+ * environments with slow networks or very large repositories.
+ *
+ * Implemented as a function (rather than a module-load constant) so test code
+ * can stub the env var via `vi.stubEnv` after the module has been imported.
+ */
+function getInstructionGenerationTimeoutMs(): number {
+  return parsePositiveIntEnv("AGENTRC_INSTRUCTION_TIMEOUT_MS") ?? 600_000;
+}
+
 const READ_ONLY_PERMISSION_HANDLER: PermissionHandler = (request) => {
   if (request.kind === "read" || request.kind === "custom-tool") {
-    // SDK 0.3.0+ / CLI 1.0.x renamed "approved" -> "approve-once".
-    // Cast through unknown so the 0.2.x typings (which still declare "approved")
-    // continue to compile while we emit the wire shape the new CLI requires.
-    return { kind: "approve-once" } as unknown as ReturnType<PermissionHandler>;
+    return wirePermissionResponse("approve-once");
   }
 
-  return {
-    kind: "user-not-available"
-  } as unknown as ReturnType<PermissionHandler>;
+  return wirePermissionResponse("user-not-available");
 };
 
 function getSessionError(errorMsg: string): Error {
@@ -371,7 +381,7 @@ ${existingSection}`;
     progress("Analyzing codebase...");
     let sendError: unknown;
     try {
-      await session.sendAndWait({ prompt }, 600000);
+      await session.sendAndWait({ prompt }, getInstructionGenerationTimeoutMs());
     } catch (err) {
       sendError = err;
     } finally {
@@ -474,7 +484,7 @@ ${existingSection ? `\nDo NOT duplicate content already covered by existing inst
     progress(`Analyzing area "${area.name}"...`);
     let sendError: unknown;
     try {
-      await session.sendAndWait({ prompt }, 600000);
+      await session.sendAndWait({ prompt }, getInstructionGenerationTimeoutMs());
     } catch (err) {
       sendError = err;
     } finally {
@@ -775,7 +785,7 @@ ${existingSection ? `\nDo NOT duplicate content from existing instruction files\
 
   let sendError: unknown;
   try {
-    await session.sendAndWait({ prompt }, 600000);
+    await session.sendAndWait({ prompt }, getInstructionGenerationTimeoutMs());
   } catch (err) {
     sendError = err;
   } finally {
@@ -859,7 +869,7 @@ Description: ${options.topic.description}`;
 
   let sendError: unknown;
   try {
-    await session.sendAndWait({ prompt }, 600000);
+    await session.sendAndWait({ prompt }, getInstructionGenerationTimeoutMs());
   } catch (err) {
     sendError = err;
   } finally {

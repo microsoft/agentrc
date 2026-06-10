@@ -14,6 +14,22 @@ export function logCopilotDebug(message: string): void {
   process.stderr.write(`[agentrc:copilot] ${message}\n`);
 }
 
+/**
+ * Parse a positive-integer environment variable.  Returns the parsed value
+ * when the env var is set to a finite number > 0; otherwise returns
+ * `undefined` so callers can apply their own default.  Emits a debug log
+ * when the variable is set but unparseable, so users running with
+ * `AGENTRC_DEBUG_COPILOT=1` can see when their override was rejected.
+ */
+export function parsePositiveIntEnv(name: string): number | undefined {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return undefined;
+  const parsed = Number(raw);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  logCopilotDebug(`ignoring invalid ${name}=${raw}`);
+  return undefined;
+}
+
 export type CopilotCliConfig = {
   cliPath: string;
   cliArgs?: string[];
@@ -28,6 +44,19 @@ let cachedCliConfig: CopilotCliConfig | null = null;
 let cachedCliConfigTimestamp = 0;
 const CLI_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+/**
+ * Timeout for the `--headless --version` readiness probe.  npx may need to
+ * download `@github/copilot` on first run, so it gets a longer budget; the
+ * `.bat`-shim / Node cold start on Windows still routinely exceeds 5 s, so
+ * the non-npx path uses 20 s.  Overridable via `AGENTRC_COPILOT_PROBE_TIMEOUT_MS`.
+ */
+function getHeadlessProbeTimeoutMs(config: CopilotCliConfig): number {
+  const override = parsePositiveIntEnv("AGENTRC_COPILOT_PROBE_TIMEOUT_MS");
+  if (override !== undefined) return override;
+  const isNpx = config.cliArgs?.includes("@github/copilot") ?? false;
+  return isNpx ? 30000 : 20000;
+}
+
 function cacheConfig(config: CopilotCliConfig): CopilotCliConfig {
   cachedCliConfig = config;
   cachedCliConfigTimestamp = Date.now();
@@ -40,8 +69,7 @@ export async function assertCopilotCliReady(): Promise<CopilotCliConfig> {
   logCopilotDebug(`validating CLI compatibility with ${desc}`);
 
   try {
-    const isNpx = config.cliArgs?.includes("@github/copilot") ?? false;
-    const timeout = isNpx ? 30000 : 20000;
+    const timeout = getHeadlessProbeTimeoutMs(config);
     const [cmd, args] = buildExecArgs(config, ["--headless", "--version"]);
     await execFileAsync(cmd, args, { timeout });
   } catch {
@@ -285,9 +313,7 @@ async function findFirstCompatibleCandidate(
 }
 
 async function isHeadlessCompatible(config: CopilotCliConfig): Promise<boolean> {
-  // npx may need to download the package on first run, so allow a longer timeout
-  const isNpx = config.cliArgs?.includes("@github/copilot") ?? false;
-  const timeout = isNpx ? 30000 : 20000;
+  const timeout = getHeadlessProbeTimeoutMs(config);
   try {
     const [cmd, args] = buildExecArgs(config, ["--headless", "--version"]);
     await execFileAsync(cmd, args, { timeout });
