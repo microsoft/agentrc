@@ -41,7 +41,7 @@ export async function assertCopilotCliReady(): Promise<CopilotCliConfig> {
 
   try {
     const isNpx = config.cliArgs?.includes("@github/copilot") ?? false;
-    const timeout = isNpx ? 30000 : 5000;
+    const timeout = isNpx ? 30000 : 20000;
     const [cmd, args] = buildExecArgs(config, ["--headless", "--version"]);
     await execFileAsync(cmd, args, { timeout });
   } catch {
@@ -287,7 +287,7 @@ async function findFirstCompatibleCandidate(
 async function isHeadlessCompatible(config: CopilotCliConfig): Promise<boolean> {
   // npx may need to download the package on first run, so allow a longer timeout
   const isNpx = config.cliArgs?.includes("@github/copilot") ?? false;
-  const timeout = isNpx ? 30000 : 5000;
+  const timeout = isNpx ? 30000 : 20000;
   try {
     const [cmd, args] = buildExecArgs(config, ["--headless", "--version"]);
     await execFileAsync(cmd, args, { timeout });
