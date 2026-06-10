@@ -156,7 +156,9 @@ export type PatchedCopilotClient = Omit<
 export function attachDefaultPermissionHandler(
   client: InstanceType<CopilotSdkModule["CopilotClient"]>
 ): void {
-  const approveAll: CopilotSdk.PermissionHandler = () => ({ kind: "approved" as const });
+  // SDK 0.3.0+ / CLI 1.0.x renamed "approved" -> "approve-once".  The 0.2.x
+  // type declarations still say "approved", so we cast through unknown.
+  const approveAll = (() => ({ kind: "approve-once" })) as unknown as CopilotSdk.PermissionHandler;
   const originalCreateSession = client.createSession.bind(client);
   // Override createSession so onPermissionRequest is optional at call sites.
   // The cast targets our PatchedCopilotClient createSession signature which

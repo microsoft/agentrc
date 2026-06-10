@@ -816,17 +816,20 @@ describe("instruction generation sessions", () => {
   const expectReadOnlyPermissions = async (
     onPermissionRequest: (request: { kind: string }) => Promise<{ kind: string }> | { kind: string }
   ) => {
+    // SDK 0.3.0+ / CLI 1.0.x renamed the permission response vocabulary:
+    //   "approved" -> "approve-once"
+    //   "denied-no-approval-rule-and-could-not-request-from-user" -> "user-not-available"
     await expect(Promise.resolve(onPermissionRequest({ kind: "read" }))).resolves.toEqual({
-      kind: "approved"
+      kind: "approve-once"
     });
     await expect(Promise.resolve(onPermissionRequest({ kind: "custom-tool" }))).resolves.toEqual({
-      kind: "approved"
+      kind: "approve-once"
     });
     await expect(Promise.resolve(onPermissionRequest({ kind: "shell" }))).resolves.toEqual({
-      kind: "denied-no-approval-rule-and-could-not-request-from-user"
+      kind: "user-not-available"
     });
     await expect(Promise.resolve(onPermissionRequest({ kind: "write" }))).resolves.toEqual({
-      kind: "denied-no-approval-rule-and-could-not-request-from-user"
+      kind: "user-not-available"
     });
   };
 

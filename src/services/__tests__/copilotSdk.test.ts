@@ -36,13 +36,14 @@ describe("attachDefaultPermissionHandler", () => {
     expect(passedConfig.config).toHaveProperty("onPermissionRequest");
     expect(typeof passedConfig.config.onPermissionRequest).toBe("function");
 
-    // The injected handler should approve all request kinds
+    // The injected handler should approve all request kinds.
+    // SDK 0.3.0+ / CLI 1.0.x renamed "approved" -> "approve-once".
     const handler = passedConfig.config.onPermissionRequest as (req: unknown) => { kind: string };
-    expect(handler({ kind: "shell" })).toEqual({ kind: "approved" });
-    expect(handler({ kind: "write" })).toEqual({ kind: "approved" });
-    expect(handler({ kind: "read" })).toEqual({ kind: "approved" });
-    expect(handler({ kind: "url" })).toEqual({ kind: "approved" });
-    expect(handler({ kind: "mcp" })).toEqual({ kind: "approved" });
+    expect(handler({ kind: "shell" })).toEqual({ kind: "approve-once" });
+    expect(handler({ kind: "write" })).toEqual({ kind: "approve-once" });
+    expect(handler({ kind: "read" })).toEqual({ kind: "approve-once" });
+    expect(handler({ kind: "url" })).toEqual({ kind: "approve-once" });
+    expect(handler({ kind: "mcp" })).toEqual({ kind: "approve-once" });
   });
 
   it("preserves a caller-supplied onPermissionRequest", async () => {

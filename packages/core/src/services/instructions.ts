@@ -226,12 +226,15 @@ const INSTRUCTION_GENERATION_EXCLUDED_TOOLS = [
 
 const READ_ONLY_PERMISSION_HANDLER: PermissionHandler = (request) => {
   if (request.kind === "read" || request.kind === "custom-tool") {
-    return { kind: "approved" };
+    // SDK 0.3.0+ / CLI 1.0.x renamed "approved" -> "approve-once".
+    // Cast through unknown so the 0.2.x typings (which still declare "approved")
+    // continue to compile while we emit the wire shape the new CLI requires.
+    return { kind: "approve-once" } as unknown as ReturnType<PermissionHandler>;
   }
 
   return {
-    kind: "denied-no-approval-rule-and-could-not-request-from-user"
-  };
+    kind: "user-not-available"
+  } as unknown as ReturnType<PermissionHandler>;
 };
 
 function getSessionError(errorMsg: string): Error {
