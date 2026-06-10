@@ -371,7 +371,7 @@ ${existingSection}`;
     progress("Analyzing codebase...");
     let sendError: unknown;
     try {
-      await session.sendAndWait({ prompt }, 180000);
+      await session.sendAndWait({ prompt }, 600000);
     } catch (err) {
       sendError = err;
     } finally {
@@ -474,7 +474,7 @@ ${existingSection ? `\nDo NOT duplicate content already covered by existing inst
     progress(`Analyzing area "${area.name}"...`);
     let sendError: unknown;
     try {
-      await session.sendAndWait({ prompt }, 180000);
+      await session.sendAndWait({ prompt }, 600000);
     } catch (err) {
       sendError = err;
     } finally {
@@ -775,7 +775,7 @@ ${existingSection ? `\nDo NOT duplicate content from existing instruction files\
 
   let sendError: unknown;
   try {
-    await session.sendAndWait({ prompt }, 180000);
+    await session.sendAndWait({ prompt }, 600000);
   } catch (err) {
     sendError = err;
   } finally {
@@ -859,7 +859,7 @@ Description: ${options.topic.description}`;
 
   let sendError: unknown;
   try {
-    await session.sendAndWait({ prompt }, 180000);
+    await session.sendAndWait({ prompt }, 600000);
   } catch (err) {
     sendError = err;
   } finally {
