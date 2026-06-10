@@ -36,7 +36,7 @@ export function parsePositiveIntEnv(name: string): number | undefined {
     const parsed = Number(trimmed);
     if (Number.isSafeInteger(parsed) && parsed > 0) return parsed;
   }
-  logCopilotDebug(`ignoring invalid ${name}=${raw}`);
+  logCopilotDebug(`ignoring invalid ${name}=${JSON.stringify(raw)}`);
   return undefined;
 }
 
@@ -65,7 +65,10 @@ const CLI_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 export function getHeadlessProbeTimeoutMs(config: CopilotCliConfig): number {
   const override = parsePositiveIntEnv("AGENTRC_COPILOT_PROBE_TIMEOUT_MS");
   if (override !== undefined) return override;
-  const isNpx = config.cliArgs?.includes("@github/copilot") ?? false;
+  const isNpx =
+    config.cliArgs?.some(
+      (arg) => arg === "@github/copilot" || arg.startsWith("@github/copilot@")
+    ) ?? false;
   return isNpx ? 30000 : 20000;
 }
 

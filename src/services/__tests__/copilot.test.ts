@@ -3,7 +3,7 @@ import {
   getHeadlessProbeTimeoutMs,
   parsePositiveIntEnv
 } from "@agentrc/core/services/copilot";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("extractModelChoices", () => {
   it("extracts model names from a single-line --help output", () => {
@@ -42,18 +42,13 @@ describe("extractModelChoices", () => {
 
 describe("parsePositiveIntEnv", () => {
   const NAME = "AGENTRC_TEST_TIMEOUT_MS";
-  const original = process.env[NAME];
 
   beforeEach(() => {
-    delete process.env[NAME];
+    vi.stubEnv(NAME, undefined);
   });
 
   afterEach(() => {
-    if (original === undefined) {
-      delete process.env[NAME];
-    } else {
-      process.env[NAME] = original;
-    }
+    vi.unstubAllEnvs();
   });
 
   it("returns undefined when the variable is unset", () => {
@@ -61,84 +56,88 @@ describe("parsePositiveIntEnv", () => {
   });
 
   it("parses a plain positive integer", () => {
-    process.env[NAME] = "5000";
+    vi.stubEnv(NAME, "5000");
     expect(parsePositiveIntEnv(NAME)).toBe(5000);
   });
 
   it("trims surrounding whitespace", () => {
-    process.env[NAME] = "  42  ";
+    vi.stubEnv(NAME, "  42  ");
     expect(parsePositiveIntEnv(NAME)).toBe(42);
   });
 
   it("accepts leading zeros as base-10 (no octal)", () => {
-    process.env[NAME] = "007";
+    vi.stubEnv(NAME, "007");
     expect(parsePositiveIntEnv(NAME)).toBe(7);
   });
 
   it("rejects non-integer decimals like 1.5", () => {
-    process.env[NAME] = "1.5";
+    vi.stubEnv(NAME, "1.5");
     expect(parsePositiveIntEnv(NAME)).toBeUndefined();
   });
 
   it("rejects scientific notation like 1e3", () => {
-    process.env[NAME] = "1e3";
+    vi.stubEnv(NAME, "1e3");
     expect(parsePositiveIntEnv(NAME)).toBeUndefined();
   });
 
   it("rejects hex literals like 0x10", () => {
-    process.env[NAME] = "0x10";
+    vi.stubEnv(NAME, "0x10");
     expect(parsePositiveIntEnv(NAME)).toBeUndefined();
   });
 
   it("rejects signed values", () => {
-    process.env[NAME] = "+5";
+    vi.stubEnv(NAME, "+5");
     expect(parsePositiveIntEnv(NAME)).toBeUndefined();
   });
 
   it("rejects zero and negatives", () => {
-    process.env[NAME] = "0";
+    vi.stubEnv(NAME, "0");
     expect(parsePositiveIntEnv(NAME)).toBeUndefined();
-    process.env[NAME] = "-5";
+    vi.stubEnv(NAME, "-5");
     expect(parsePositiveIntEnv(NAME)).toBeUndefined();
   });
 
   it("rejects empty and whitespace-only values", () => {
-    process.env[NAME] = "";
+    vi.stubEnv(NAME, "");
     expect(parsePositiveIntEnv(NAME)).toBeUndefined();
-    process.env[NAME] = "   ";
+    vi.stubEnv(NAME, "   ");
     expect(parsePositiveIntEnv(NAME)).toBeUndefined();
   });
 
   it("rejects non-numeric junk", () => {
-    process.env[NAME] = "5px";
+    vi.stubEnv(NAME, "5px");
     expect(parsePositiveIntEnv(NAME)).toBeUndefined();
   });
 
   it("rejects values beyond the safe-integer range", () => {
-    process.env[NAME] = "99999999999999999999";
+    vi.stubEnv(NAME, "99999999999999999999");
     expect(parsePositiveIntEnv(NAME)).toBeUndefined();
   });
 });
 
 describe("getHeadlessProbeTimeoutMs", () => {
   const ENV = "AGENTRC_COPILOT_PROBE_TIMEOUT_MS";
-  const original = process.env[ENV];
 
   beforeEach(() => {
-    delete process.env[ENV];
+    vi.stubEnv(ENV, undefined);
   });
 
   afterEach(() => {
-    if (original === undefined) {
-      delete process.env[ENV];
-    } else {
-      process.env[ENV] = original;
-    }
+    vi.unstubAllEnvs();
   });
 
   it("uses 30s for the npx candidate", () => {
     expect(
       getHeadlessProbeTimeoutMs({ cliPath: "npx", cliArgs: ["--yes", "@github/copilot"] })
+    ).toBe(30000);
+  });
+
+  it("uses 30s for a versioned npx spec (e.g. @github/copilot@latest)", () => {
+    expect(
+      getHeadlessProbeTimeoutMs({ cliPath: "npx", cliArgs: ["--yes", "@github/copilot@latest"] })
+    ).toBe(30000);
+    expect(
+      getHeadlessProbeTimeoutMs({ cliPath: "npx", cliArgs: ["-y", "@github/copilot@0.3.0"] })
     ).toBe(30000);
   });
 
@@ -152,8 +151,14 @@ describe("getHeadlessProbeTimeoutMs", () => {
     ).toBe(20000);
   });
 
+  it("does not treat a substring match (e.g. @github/copilot-foo) as npx", () => {
+    expect(
+      getHeadlessProbeTimeoutMs({ cliPath: "npx", cliArgs: ["--yes", "@github/copilot-foo"] })
+    ).toBe(20000);
+  });
+
   it("honors a valid override for both npx and non-npx candidates", () => {
-    process.env[ENV] = "12345";
+    vi.stubEnv(ENV, "12345");
     expect(getHeadlessProbeTimeoutMs({ cliPath: "/usr/bin/copilot" })).toBe(12345);
     expect(
       getHeadlessProbeTimeoutMs({ cliPath: "npx", cliArgs: ["--yes", "@github/copilot"] })
@@ -161,7 +166,7 @@ describe("getHeadlessProbeTimeoutMs", () => {
   });
 
   it("ignores an invalid override and falls back to the default", () => {
-    process.env[ENV] = "not-a-number";
+    vi.stubEnv(ENV, "not-a-number");
     expect(getHeadlessProbeTimeoutMs({ cliPath: "/usr/bin/copilot" })).toBe(20000);
   });
 });
