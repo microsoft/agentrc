@@ -1,5 +1,9 @@
-import { extractModelChoices, parsePositiveIntEnv } from "@agentrc/core/services/copilot";
-import { afterEach, describe, expect, it } from "vitest";
+import {
+  extractModelChoices,
+  getHeadlessProbeTimeoutMs,
+  parsePositiveIntEnv
+} from "@agentrc/core/services/copilot";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("extractModelChoices", () => {
   it("extracts model names from a single-line --help output", () => {
@@ -38,13 +42,21 @@ describe("extractModelChoices", () => {
 
 describe("parsePositiveIntEnv", () => {
   const NAME = "AGENTRC_TEST_TIMEOUT_MS";
+  const original = process.env[NAME];
 
-  afterEach(() => {
+  beforeEach(() => {
     delete process.env[NAME];
   });
 
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env[NAME];
+    } else {
+      process.env[NAME] = original;
+    }
+  });
+
   it("returns undefined when the variable is unset", () => {
-    delete process.env[NAME];
     expect(parsePositiveIntEnv(NAME)).toBeUndefined();
   });
 
@@ -105,5 +117,51 @@ describe("parsePositiveIntEnv", () => {
   it("rejects values beyond the safe-integer range", () => {
     process.env[NAME] = "99999999999999999999";
     expect(parsePositiveIntEnv(NAME)).toBeUndefined();
+  });
+});
+
+describe("getHeadlessProbeTimeoutMs", () => {
+  const ENV = "AGENTRC_COPILOT_PROBE_TIMEOUT_MS";
+  const original = process.env[ENV];
+
+  beforeEach(() => {
+    delete process.env[ENV];
+  });
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env[ENV];
+    } else {
+      process.env[ENV] = original;
+    }
+  });
+
+  it("uses 30s for the npx candidate", () => {
+    expect(
+      getHeadlessProbeTimeoutMs({ cliPath: "npx", cliArgs: ["--yes", "@github/copilot"] })
+    ).toBe(30000);
+  });
+
+  it("uses 20s for a bare-path (non-npx) candidate", () => {
+    expect(getHeadlessProbeTimeoutMs({ cliPath: "/usr/bin/copilot" })).toBe(20000);
+  });
+
+  it("uses 20s when cliArgs do not include @github/copilot", () => {
+    expect(
+      getHeadlessProbeTimeoutMs({ cliPath: process.execPath, cliArgs: ["/path/to/npm-loader.js"] })
+    ).toBe(20000);
+  });
+
+  it("honors a valid override for both npx and non-npx candidates", () => {
+    process.env[ENV] = "12345";
+    expect(getHeadlessProbeTimeoutMs({ cliPath: "/usr/bin/copilot" })).toBe(12345);
+    expect(
+      getHeadlessProbeTimeoutMs({ cliPath: "npx", cliArgs: ["--yes", "@github/copilot"] })
+    ).toBe(12345);
+  });
+
+  it("ignores an invalid override and falls back to the default", () => {
+    process.env[ENV] = "not-a-number";
+    expect(getHeadlessProbeTimeoutMs({ cliPath: "/usr/bin/copilot" })).toBe(20000);
   });
 });

@@ -18,10 +18,14 @@ export function logCopilotDebug(message: string): void {
  * Parse a positive-integer environment variable.  Accepts only a base-10
  * integer literal (after trimming surrounding whitespace) so surprising
  * inputs such as `"1.5"`, `"1e3"`, or `"0x10"` are rejected rather than
- * silently coerced.  Returns the parsed value when it is an integer > 0;
+ * silently coerced.  Returns the parsed value when it is a safe integer > 0;
  * otherwise returns `undefined` so callers can apply their own default.
- * Emits a debug log when the variable is set but rejected, so users running
- * with `AGENTRC_DEBUG_COPILOT=1` can see when their override was ignored.
+ *
+ * An unset, empty, or whitespace-only value is treated as "not configured"
+ * and returns `undefined` silently.  A value that is present and non-blank
+ * but not a valid positive integer is rejected and logged via
+ * `logCopilotDebug`, so users running with `AGENTRC_DEBUG_COPILOT=1` can see
+ * when their override was ignored.
  */
 export function parsePositiveIntEnv(name: string): number | undefined {
   const raw = process.env[name];
@@ -55,8 +59,10 @@ const CLI_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
  * download `@github/copilot` on first run, so it gets a longer budget; the
  * `.bat`-shim / Node cold start on Windows still routinely exceeds 5 s, so
  * the non-npx path uses 20 s.  Overridable via `AGENTRC_COPILOT_PROBE_TIMEOUT_MS`.
+ *
+ * Exported for unit testing of the selection logic.
  */
-function getHeadlessProbeTimeoutMs(config: CopilotCliConfig): number {
+export function getHeadlessProbeTimeoutMs(config: CopilotCliConfig): number {
   const override = parsePositiveIntEnv("AGENTRC_COPILOT_PROBE_TIMEOUT_MS");
   if (override !== undefined) return override;
   const isNpx = config.cliArgs?.includes("@github/copilot") ?? false;
