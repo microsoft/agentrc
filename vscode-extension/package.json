@@ -312,17 +312,17 @@
   ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@github/copilot-sdk": "^0.2.0",
+    "@github/copilot-sdk": "^1.0.2",
     "@octokit/rest": "^22.0.1",
-    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/eslint-plugin": "^8.61.1",
     "@typescript-eslint/parser": "^8.56.0",
-    "@types/node": "^25.5.0",
-    "@types/vscode": "^1.110.0",
-    "@vscode/vsce": "^3.7.1",
+    "@types/node": "^25.9.3",
+    "@types/vscode": "^1.125.0",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.28.1",
-    "eslint": "^10.0.3",
+    "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
-    "globals": "^17.3.0",
-    "typescript": "^5.9.3"
+    "globals": "^17.6.0",
+    "typescript": "^6.0.3"
   }
 }
