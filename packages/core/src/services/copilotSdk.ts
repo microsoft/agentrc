@@ -6,6 +6,36 @@ import { buildExecArgs, logCopilotDebug, type CopilotCliConfig } from "./copilot
 
 export type CopilotSdkModule = typeof CopilotSdk;
 
+/**
+ * Permission response kinds the bundled Copilot CLI 1.0.x accepts.
+ * Mirrors the SDK 0.3.0 vocabulary (https://github.com/github/copilot-sdk/releases/tag/v0.3.0).
+ *
+ * Note: this is the *response* kind sent back from a permission handler,
+ * not the *request* kind (`"read"`, `"shell"`, ...) the SDK passes in.
+ */
+export type WirePermissionResponseKind =
+  | "approve-once"
+  | "approve-for-session"
+  | "approve-for-location"
+  | "reject"
+  | "user-not-available";
+
+/**
+ * Build the wire-shape permission response the Copilot CLI expects.
+ *
+ * The bundled CLI 1.0.x speaks the SDK 0.3.0+ vocabulary, but agentrc pins
+ * `@github/copilot-sdk` to ^0.2.0 whose type declarations still describe the
+ * older `"approved"` / `"denied-..."` kinds.  This helper isolates the
+ * necessary unchecked cast in one place so the rest of the codebase can stay
+ * strict; remove it and use `{ kind } as const` once the SDK dependency is
+ * bumped.
+ */
+export function wirePermissionResponse(
+  kind: WirePermissionResponseKind
+): ReturnType<CopilotSdk.PermissionHandler> {
+  return { kind } as unknown as ReturnType<CopilotSdk.PermissionHandler>;
+}
+
 let cachedSdkModule: Promise<CopilotSdkModule> | null = null;
 
 function normalizeSdkLoadError(error: unknown): Error {
@@ -156,7 +186,7 @@ export type PatchedCopilotClient = Omit<
 export function attachDefaultPermissionHandler(
   client: InstanceType<CopilotSdkModule["CopilotClient"]>
 ): void {
-  const approveAll: CopilotSdk.PermissionHandler = () => ({ kind: "approved" as const });
+  const approveAll: CopilotSdk.PermissionHandler = () => wirePermissionResponse("approve-once");
   const originalCreateSession = client.createSession.bind(client);
   // Override createSession so onPermissionRequest is optional at call sites.
   // The cast targets our PatchedCopilotClient createSession signature which

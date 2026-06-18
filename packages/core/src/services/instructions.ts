@@ -8,8 +8,8 @@ import { ensureDir, safeWriteFile } from "../utils/fs";
 
 import type { Area, InstructionStrategy } from "./analyzer";
 import { sanitizeAreaName } from "./analyzer";
-import { assertCopilotCliReady } from "./copilot";
-import { createCopilotClient, loadCopilotSdk } from "./copilotSdk";
+import { assertCopilotCliReady, parsePositiveIntEnv } from "./copilot";
+import { createCopilotClient, loadCopilotSdk, wirePermissionResponse } from "./copilotSdk";
 import type { FileAction } from "./generator";
 import { getSkillDirectory } from "./skills";
 
@@ -224,14 +224,27 @@ const INSTRUCTION_GENERATION_EXCLUDED_TOOLS = [
   "str_replace_editor"
 ];
 
+/**
+ * Upper bound for a single `session.sendAndWait` call during instruction
+ * generation.  Generation drives an agent loop with many tool calls and on
+ * slower endpoints or larger repos the total run can exceed the SDK's default
+ * 3-minute budget.  This is a ceiling, not an idle wait — fast runs complete
+ * well under a minute.  Overridable via `AGENTRC_INSTRUCTION_TIMEOUT_MS` for
+ * environments with slow networks or very large repositories.
+ *
+ * Implemented as a function (rather than a module-load constant) so test code
+ * can stub the env var via `vi.stubEnv` after the module has been imported.
+ */
+function getInstructionGenerationTimeoutMs(): number {
+  return parsePositiveIntEnv("AGENTRC_INSTRUCTION_TIMEOUT_MS") ?? 600_000;
+}
+
 const READ_ONLY_PERMISSION_HANDLER: PermissionHandler = (request) => {
   if (request.kind === "read" || request.kind === "custom-tool") {
-    return { kind: "approved" };
+    return wirePermissionResponse("approve-once");
   }
 
-  return {
-    kind: "denied-no-approval-rule-and-could-not-request-from-user"
-  };
+  return wirePermissionResponse("user-not-available");
 };
 
 function getSessionError(errorMsg: string): Error {
@@ -338,6 +351,8 @@ export async function generateCopilotInstructions(
       skillDirectories: [rootSkillDir]
     });
 
+    const timeoutMs = getInstructionGenerationTimeoutMs();
+
     await trySetAutopilot(session);
 
     let content = "";
@@ -368,7 +383,7 @@ ${existingSection}`;
     progress("Analyzing codebase...");
     let sendError: unknown;
     try {
-      await session.sendAndWait({ prompt }, 180000);
+      await session.sendAndWait({ prompt }, timeoutMs);
     } catch (err) {
       sendError = err;
     } finally {
@@ -439,6 +454,8 @@ export async function generateAreaInstructions(
       skillDirectories: [areaSkillDir]
     });
 
+    const timeoutMs = getInstructionGenerationTimeoutMs();
+
     await trySetAutopilot(session);
 
     let content = "";
@@ -471,7 +488,7 @@ ${existingSection ? `\nDo NOT duplicate content already covered by existing inst
     progress(`Analyzing area "${area.name}"...`);
     let sendError: unknown;
     try {
-      await session.sendAndWait({ prompt }, 180000);
+      await session.sendAndWait({ prompt }, timeoutMs);
     } catch (err) {
       sendError = err;
     } finally {
@@ -699,6 +716,7 @@ async function generateNestedHub(
     area?: Area;
     childAreas?: Area[];
     model?: string;
+    timeoutMs: number;
     onProgress?: (message: string) => void;
   }
 ): Promise<HubResult> {
@@ -772,7 +790,7 @@ ${existingSection ? `\nDo NOT duplicate content from existing instruction files\
 
   let sendError: unknown;
   try {
-    await session.sendAndWait({ prompt }, 180000);
+    await session.sendAndWait({ prompt }, options.timeoutMs);
   } catch (err) {
     sendError = err;
   } finally {
@@ -799,6 +817,7 @@ async function generateNestedDetail(
     topic: NestedTopic;
     area?: Area;
     model?: string;
+    timeoutMs: number;
     onProgress?: (message: string) => void;
   }
 ): Promise<string> {
@@ -856,7 +875,7 @@ Description: ${options.topic.description}`;
 
   let sendError: unknown;
   try {
-    await session.sendAndWait({ prompt }, 180000);
+    await session.sendAndWait({ prompt }, options.timeoutMs);
   } catch (err) {
     sendError = err;
   } finally {
@@ -895,6 +914,8 @@ export async function generateNestedInstructions(
   progress("Starting Copilot SDK...");
   const client = await createCopilotClient(cliConfig);
 
+  const timeoutMs = getInstructionGenerationTimeoutMs();
+
   try {
     // Step 1: Generate hub
     const { hubContent, topics } = await generateNestedHub(client, {
@@ -903,6 +924,7 @@ export async function generateNestedInstructions(
       area: options.area,
       childAreas: options.childAreas,
       model: options.model,
+      timeoutMs,
       onProgress: options.onProgress
     });
 
@@ -931,6 +953,7 @@ export async function generateNestedInstructions(
           topic,
           area: options.area,
           model: options.model,
+          timeoutMs,
           onProgress: options.onProgress
         });
         if (detailContent) {
