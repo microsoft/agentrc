@@ -22,7 +22,7 @@ COPY webapp/backend/package.json ./package.json
 COPY --from=deps /app/webapp/backend/node_modules ./node_modules
 COPY --from=deps /app/node_modules /app/node_modules
 COPY --from=build /app/webapp/backend/dist ./dist
-COPY webapp/frontend/ /app/frontend/
+COPY webapp/frontend/ /app/webapp/frontend/
 ENV REPORTS_DIR=/app/data/reports
 RUN mkdir -p /app/data \
   && chown -R node:node /app

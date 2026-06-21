@@ -1,0 +1,21 @@
+{
+  "name": "AgentRC",
+  "short_name": "AgentRC",
+  "description": "AI Readiness Scanner — Context engineering for AI coding agents",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    {
+      "src": "/assets/favicon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/favicon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
