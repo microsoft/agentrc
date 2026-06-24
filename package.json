@@ -29,11 +29,11 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@github/copilot-sdk": "^0.2.0",
+    "@github/copilot-sdk": "^1.0.3",
     "@inquirer/prompts": "^8.2.1",
     "@octokit/rest": "^22.0.1",
     "chalk": "^5.6.2",
-    "commander": "^14.0.3",
+    "commander": "^15.0.0",
     "fast-glob": "^3.3.3",
     "ink": "^7.0.0",
     "react": "^19.2.4",
