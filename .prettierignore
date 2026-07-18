@@ -4,6 +4,9 @@
 .github/agents/agentic-workflows.md
 .github/skills/agentic-workflows/SKILL.md
 
+# Generated SpecKit skills are integration-managed and read-only in local workspaces
+.agents/
+
 # Webapp has its own formatting; Dockerfile is not parseable by Prettier
 webapp/
 Dockerfile.webapp

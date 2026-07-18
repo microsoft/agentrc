@@ -42,7 +42,7 @@ All pull requests run the following required status checks before merge:
 | `lint-extension`      | ESLint (vscode-extension)                       |
 | `typecheck`           | TypeScript (root)                               |
 | `typecheck-extension` | TypeScript (vscode-extension)                   |
-| `test`                | Vitest (Node 20 + 22, ubuntu + windows)         |
+| `test`                | Vitest (Node 22, Ubuntu + Windows)              |
 | `build`               | tsup build + CLI version assertion + ext bundle |
 
 To configure branch protection rules in GitHub:

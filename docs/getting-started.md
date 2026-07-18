@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-- **Node.js 20+**
+- **Node.js 22+**
 - **GitHub Copilot CLI** — bundled with the [VS Code Copilot Chat extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat). Run `copilot` → `/login` to authenticate.
 - **Git host auth** — GitHub: `gh` CLI or `GITHUB_TOKEN`/`GH_TOKEN` env var. Azure DevOps: `AZURE_DEVOPS_PAT` (or `AZDO_PAT`) env var.
 

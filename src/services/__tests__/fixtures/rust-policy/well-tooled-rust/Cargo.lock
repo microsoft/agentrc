@@ -1,0 +1,2 @@
+# This fixture lockfile intentionally contains no resolved packages.
+version = 4

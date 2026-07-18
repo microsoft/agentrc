@@ -1,0 +1,8 @@
+{
+  "name": "mixed-rust-node",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test.mjs"
+  }
+}

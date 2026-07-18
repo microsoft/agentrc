@@ -50,3 +50,31 @@ Use `agentrc instructions` when you want the dedicated instruction-generation wo
 `agentrc.eval.json` is a starter eval config with implementation planning tasks. Expectations can be a single string or an array of strings for structured criteria. All AgentRC JSON files support `//` and `/* */` comments (JSONC).
 
 See `policies/README.md` for details on the included readiness policies and how to compose them.
+
+## Rust readiness from a source checkout
+
+[`policies/rust.mjs`](policies/rust.mjs) is trusted executable code for repositories that use Cargo.
+It replaces the JavaScript-centric lint, format, typecheck, build, test, and lockfile checks when the
+repository is pure Rust, and adds Rust toolchain and supply-chain checks.
+
+From this source checkout, run:
+
+```sh
+agentrc readiness /path/to/rust-repo --policy ./examples/policies/rust.mjs
+```
+
+The npm package publishes only `dist/`, not `examples/`. With an installed CLI, copy and review
+`rust.mjs` into the target repository or another trusted local location, then pass that copied path
+through `--policy`. Module policies cannot be configured in `agentrc.config.json`; that file accepts
+JSON policies only.
+
+Treat that copy as version-coupled to the AgentRC release it came from. When upgrading AgentRC,
+review the current source policy and re-copy it so its criterion IDs and result metadata stay aligned
+with the installed CLI.
+
+For policy chains, place the Rust policy before an organization baseline so the organization's later
+metadata overrides or disables continue to win:
+
+```sh
+agentrc readiness /path/to/rust-repo --policy ./rust.mjs,./org-baseline.json
+```

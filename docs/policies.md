@@ -12,7 +12,7 @@ agentrc readiness --policy ./base.json,./overrides.json   # chain multiple
 agentrc readiness --policy @org/agentrc-policy-strict      # npm package
 ```
 
-Or set it in [configuration](configuration.md):
+Or set a JSON policy in [configuration](configuration.md):
 
 ```json
 {
@@ -20,15 +20,44 @@ Or set it in [configuration](configuration.md):
 }
 ```
 
-## Built-in examples
+## Example policies
 
-AgentRC ships with three example policies in `examples/policies/`:
+The source checkout contains these example policies in `examples/policies/`. The published npm
+package contains `dist/` only, so copy a reviewed example to a local path when using an installed
+CLI.
 
-| Policy                  | What it does                                           |
-| ----------------------- | ------------------------------------------------------ |
-| `strict.json`           | 100% pass rate, raises impact on key criteria          |
-| `ai-only.json`          | Disables all repo-health checks, focuses on AI tooling |
-| `repo-health-only.json` | Disables AI checks, focuses on traditional quality     |
+| Policy                  | What it does                                                      |
+| ----------------------- | ----------------------------------------------------------------- |
+| `strict.json`           | 100% pass rate, raises impact on key criteria                     |
+| `ai-only.json`          | Disables all repo-health checks, focuses on AI tooling            |
+| `repo-health-only.json` | Disables AI checks, focuses on traditional quality                |
+| `rust.mjs`              | Trusted Rust/Cargo readiness policy with conditional replacements |
+
+## Rust readiness policy
+
+`examples/policies/rust.mjs` is a self-contained `.mjs` module for Node.js 22 or newer. It replaces
+six primary readiness criteria for pure Rust repositories—lint, format, type checking, build, test,
+and lockfile checks—and adds explicit toolchain-pinning and supply-chain-policy criteria. It uses
+fixed repository-relative probes, at most one 1 MiB-capped `Cargo.toml` content read, and no
+subprocess, network, or filesystem-write capability.
+
+```bash
+agentrc readiness /path/to/rust-repo --policy ./examples/policies/rust.mjs
+```
+
+Treat module policies as **trusted executable code** and review a copied file before loading it.
+They are allowed only through the CLI `--policy` option; `agentrc.config.json` is JSON-only and must
+not reference `.mjs` files. The example keeps existing Node behavior for mixed Rust/Node repositories
+because repo-scoped checks cannot prove separate coverage for each ecosystem. A missing `Cargo.lock`
+in a pure Rust repository is skipped rather than treated as an application failure.
+
+When an organization policy overrides metadata or disables a replacement, load it after the Rust
+policy so the documented last-policy-wins behavior is preserved:
+
+```bash
+agentrc readiness /path/to/rust-repo \
+  --policy ./examples/policies/rust.mjs,./org-baseline.json
+```
 
 ## Writing a policy
 

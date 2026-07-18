@@ -6,7 +6,7 @@ AgentRC commands return structured output and exit codes designed for CI pipelin
 
 ## Prerequisites
 
-- **Node.js 20+** on the runner
+- **Node.js 22+** on the runner
 - **Auth token** — GitHub: `GITHUB_TOKEN` or `GH_TOKEN`. Azure DevOps: `AZURE_DEVOPS_PAT` or `AZDO_PAT`.
 - **Copilot CLI** — required for `eval` (it calls the Copilot SDK). Not needed for `readiness`. See the [VS Code Copilot Chat extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat) docs for installation.
 
@@ -45,7 +45,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Check readiness
         run: npx github:microsoft/agentrc readiness --fail-level 3 --json
@@ -72,7 +72,7 @@ pool:
 steps:
   - task: NodeTool@0
     inputs:
-      versionSpec: "20.x"
+      versionSpec: "22.x"
 
   - script: npx github:microsoft/agentrc readiness --fail-level 3 --json
     displayName: Check readiness
