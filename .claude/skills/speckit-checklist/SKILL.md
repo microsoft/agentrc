@@ -270,7 +270,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 - Simple, memorable filenames that indicate checklist purpose
 - Easy identification and navigation in the `checklists/` folder
 
-To avoid clutter, use descriptive types and clean up obsolete checklists when done.
+To avoid clutter, use descriptive types. Do not delete or overwrite existing checklist files or content automatically; report obsolete checklist candidates and require explicit user direction before any removal.
 
 ## Example Checklist Types & Sample Items
 

@@ -89,7 +89,7 @@ Given that feature description, do this:
    Specs live under the default `specs/` directory unless the user explicitly provides `SPECIFY_FEATURE_DIRECTORY`.
 
    **Resolution order for `SPECIFY_FEATURE_DIRECTORY`**:
-   1. If the user explicitly provided `SPECIFY_FEATURE_DIRECTORY` (e.g., via environment variable, argument, or configuration), use it as-is
+   1. If the user explicitly provided `SPECIFY_FEATURE_DIRECTORY` (e.g., via environment variable, argument, or configuration), validate it before use
    2. Otherwise, auto-generate it under `specs/`:
       - Check `.specify/init-options.json` for `feature_numbering` (preferred) or `branch_numbering` (deprecated, migration only — will be removed in a future release)
       - If `"timestamp"`: prefix is `YYYYMMDD-HHMMSS` (current timestamp)
@@ -98,8 +98,15 @@ Given that feature description, do this:
       - Set `SPECIFY_FEATURE_DIRECTORY` to `specs/<directory-name>`
       - If `branch_numbering` was used (and `feature_numbering` was absent), emit a one-line warning: "⚠️ `branch_numbering` in init-options.json is deprecated. Rename to `feature_numbering`."
 
+   **Containment validation (before any directory creation, copying, or metadata write)**:
+   - Resolve the repository root and require `SPECIFY_FEATURE_DIRECTORY` to be a non-empty, repository-relative path
+   - Reject absolute paths, `.` as a destination, and any normalized path that equals `..` or starts with `../` (or the platform separator equivalent)
+   - Resolve the candidate against the repository root and reject it unless the result remains beneath that root
+   - Report the validation error and stop without writing if the path is invalid
+   - For sequential auto-numbering, reserve the selected feature directory with a single exclusive `mkdir`; if it already exists, rescan or increment and retry instead of using `mkdir -p`
+
    **Create the directory and spec file**:
-   - `mkdir -p SPECIFY_FEATURE_DIRECTORY`
+   - For a sequential auto-numbered directory, use the directory already reserved during allocation; for another validated destination, create only the required repository-relative directory
    - Resolve the active `spec-template` through the Spec Kit preset/template resolution stack (equivalent to `specify preset resolve spec-template`)
    - Copy the resolved `spec-template` file to `SPECIFY_FEATURE_DIRECTORY/spec.md` as the starting point
    - Set `SPEC_FILE` to `SPECIFY_FEATURE_DIRECTORY/spec.md`

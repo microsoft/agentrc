@@ -1,7 +1,7 @@
 ---
 name: "speckit-implement"
-description: "Execute the implementation plan by processing and executing all tasks defined in tasks.md"
-argument-hint: "Optional implementation guidance or task filter"
+description: "Execute the implementation plan by processing selected tasks defined in tasks.md"
+argument-hint: "Optional guidance; filter with T001[,T002] or phase:<name>"
 compatibility: "Requires spec-kit project structure with .specify/ directory"
 metadata:
   author: "github-spec-kit"
@@ -17,6 +17,12 @@ $ARGUMENTS
 ```
 
 You **MUST** consider the user input before proceeding (if not empty).
+
+## Task Filter
+
+Treat an argument that is exactly one task ID, a comma-separated task-ID list (for example, `T012,T013`), or `phase:<phase name>` as a task filter. Treat any other argument as implementation guidance, not a filter.
+
+After loading `tasks.md`, validate every requested task ID or phase name. If a filter matches nothing, stop and report the available IDs or phases before making changes. With a valid filter, execute only matching tasks. Do not automatically execute unselected prerequisites; report unmet dependencies and ask the user whether to expand the scope. Without a filter, execute the full task plan.
 
 ## Pre-Execution Checks
 
@@ -104,7 +110,13 @@ You **MUST** consider the user input before proceeding (if not empty).
    - **IF EXISTS**: Read .specify/memory/constitution.md for governance constraints
    - **IF EXISTS**: Read quickstart.md for integration scenarios
 
-4. **Project Setup Verification**:
+4. **Resolve execution scope**:
+   - Parse `tasks.md` into task IDs, phases, dependencies, and descriptions
+   - Apply the Task Filter rules above to produce `SELECTED_TASKS`
+   - When filtered, restrict all remaining execution and completion checks to `SELECTED_TASKS`
+
+5. **Project Setup Verification**:
+   - Perform setup changes only when no filter is set or a selected task explicitly requires them; do not create unrelated ignore files for a filtered run
    - **REQUIRED**: Create/verify ignore files based on actual project setup:
 
    **Detection & Creation Logic**:
@@ -148,27 +160,27 @@ You **MUST** consider the user input before proceeding (if not empty).
    - **Terraform**: `.terraform/`, `*.tfstate*`, `*.tfvars`, `.terraform.lock.hcl`
    - **Kubernetes/k8s**: `*.secret.yaml`, `secrets/`, `.kube/`, `kubeconfig*`, `*.key`, `*.crt`
 
-5. Parse tasks.md structure and extract:
+6. Use the parsed tasks.md structure:
    - **Task phases**: Setup, Tests, Core, Integration, Polish
    - **Task dependencies**: Sequential vs parallel execution rules
    - **Task details**: ID, description, file paths, parallel markers [P]
    - **Execution flow**: Order and dependency requirements
 
-6. Execute implementation following the task plan:
+7. Execute implementation following the selected task plan:
    - **Phase-by-phase execution**: Complete each phase before moving to the next
    - **Respect dependencies**: Run sequential tasks in order, parallel tasks [P] can run together
    - **Follow TDD approach**: Execute test tasks before their corresponding implementation tasks
    - **File-based coordination**: Tasks affecting the same files must run sequentially
    - **Validation checkpoints**: Verify each phase completion before proceeding
 
-7. Implementation execution rules:
+8. Implementation execution rules:
    - **Setup first**: Initialize project structure, dependencies, configuration
    - **Tests before code**: If you need to write tests for contracts, entities, and integration scenarios
    - **Core development**: Implement models, services, CLI commands, endpoints
    - **Integration work**: Database connections, middleware, logging, external services
    - **Polish and validation**: Unit tests, performance optimization, documentation
 
-8. Progress tracking and error handling:
+9. Progress tracking and error handling:
    - Report progress after each completed task
    - Halt execution if any non-parallel task fails
    - For parallel tasks [P], continue with successful tasks, report failed ones
@@ -176,11 +188,12 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Suggest next steps if implementation cannot proceed
    - **IMPORTANT** For completed tasks, make sure to mark the task off as [X] in the tasks file.
 
-9. Completion validation:
-   - Verify all required tasks are completed
-   - Check that implemented features match the original specification
-   - Validate that tests pass and coverage meets requirements
-   - Confirm the implementation follows the technical plan
+10. Completion validation:
+
+- Verify all selected tasks are completed (or all required tasks when no filter is set)
+- Check that implemented features match the original specification
+- Validate that tests pass and coverage meets requirements
+- Confirm the implementation follows the technical plan
 
 Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running `/speckit-tasks` first to regenerate the task list.
 
@@ -230,7 +243,7 @@ Report final status with summary of completed work.
 
 ## Done When
 
-- [ ] All tasks in tasks.md completed and marked `[X]`
+- [ ] All selected tasks completed and marked `[X]` (or all tasks when no filter is set)
 - [ ] Implementation validated against specification, plan, and test coverage
 - [ ] Extension hooks dispatched or skipped according to the rules in Mandatory Post-Execution Hooks above
 - [ ] Completion reported to user with summary of completed work

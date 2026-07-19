@@ -5,8 +5,8 @@ import { TextDecoder } from "node:util";
 
 const MAX_CARGO_MANIFEST_BYTES = 1024 * 1024;
 const MAX_CARGO_MANIFEST_READ_BYTES = MAX_CARGO_MANIFEST_BYTES + 1;
-const READ_ONLY_NOFOLLOW_FLAGS =
-  fsConstants.O_RDONLY | (typeof fsConstants.O_NOFOLLOW === "number" ? fsConstants.O_NOFOLLOW : 0);
+const HAS_NOFOLLOW = typeof fsConstants.O_NOFOLLOW === "number";
+const READ_ONLY_NOFOLLOW_FLAGS = fsConstants.O_RDONLY | (HAS_NOFOLLOW ? fsConstants.O_NOFOLLOW : 0);
 
 const NODE_LINT_CANDIDATES = [
   "eslint.config.js",
@@ -111,7 +111,23 @@ async function inspectSafeFixedPath(repoPath, candidate) {
 }
 
 function hasSameIdentity(left, right) {
-  return left.dev !== 0n && left.ino !== 0n && left.dev === right.dev && left.ino === right.ino;
+  if (left.dev !== 0n && left.ino !== 0n && right.dev !== 0n && right.ino !== 0n) {
+    return left.dev === right.dev && left.ino === right.ino;
+  }
+
+  if (left.dev !== 0n || left.ino !== 0n || right.dev !== 0n || right.ino !== 0n) {
+    return false;
+  }
+
+  // Some filesystems report zero device or inode values. When O_NOFOLLOW protects the open,
+  // compare stable metadata instead of treating otherwise safe evidence as universally absent.
+  return (
+    HAS_NOFOLLOW &&
+    left.mode === right.mode &&
+    left.size === right.size &&
+    left.mtimeNs === right.mtimeNs &&
+    left.ctimeNs === right.ctimeNs
+  );
 }
 
 async function hasUnchangedSafePath(opened) {

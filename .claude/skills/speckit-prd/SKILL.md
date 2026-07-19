@@ -43,12 +43,13 @@ Given that feature description, do this:
    - Local branches: `git branch | grep -E '^[* ]*[0-9]+-<short-name>$'`
    - Specs directories: Check for directories matching `specs/[0-9]+-<short-name>`
 
-   c. Determine the next available number:
-   - Extract all numbers from all three sources
-   - Find the highest number N
-   - Use N+1 for the new branch number
+   c. Reserve the next available number atomically:
+   - Extract all numbers from all three sources and start with the highest number N plus one
+   - For each candidate number, attempt to create the repository-local lock directory `.specify/.locks/prd-<short-name>-<number>` with a single `mkdir` (not `mkdir -p`)
+   - If lock creation reports that it already exists, treat that number as reserved by another run and try the next number
+   - Hold the lock while creating the feature, then remove only the lock directory after the create script succeeds or fails; never remove a feature directory as lock cleanup
 
-   d. Run `.specify/scripts/bash/create-new-feature.sh` once with the calculated number, short name, and the actual feature description. Pass each option once:
+   d. Only after acquiring that reservation, run `.specify/scripts/bash/create-new-feature.sh` once with the reserved number, short name, and the actual feature description. Pass each option once:
 
    ```bash
    .specify/scripts/bash/create-new-feature.sh --json --number 5 --short-name "user-auth" "Add user authentication"
@@ -56,6 +57,7 @@ Given that feature description, do this:
 
    **IMPORTANT**:
    - Check all three sources (remote branches, local branches, specs directories) to find the highest number
+   - Acquire the per-feature lock before selecting the final number so concurrent PRD runs cannot reuse it
    - Only match branches/directories with the exact short-name pattern
    - If no existing branches/directories found with this short-name, start with number 1
    - You must only ever run this script once per feature
