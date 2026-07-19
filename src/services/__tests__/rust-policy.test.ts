@@ -582,6 +582,62 @@ describe("Rust readiness policy", () => {
     await expect(fs.stat(cargoPath)).resolves.toMatchObject({ size: maxCargoManifestBytes + 1 });
   });
 
+  it("rejects a Cargo manifest changed in place during a bounded read", async () => {
+    const repoPath = await copyFixture("minimal-rust");
+    const cargoPath = path.join(repoPath, "Cargo.toml");
+    const content = Buffer.alloc(maxCargoManifestBytes, 0x20);
+    Buffer.from('[package]\nname = "in-place-race"\n\n[lints]\n').copy(content);
+    await fs.writeFile(cargoPath, content);
+
+    const originalOpen = fs.open.bind(fs);
+    let cargoOpenCount = 0;
+    let changedInPlace = false;
+    vi.spyOn(fs, "open").mockImplementation(async (target, flags, mode) => {
+      const handle = await originalOpen(target, flags, mode);
+      if (path.resolve(String(target)) !== cargoPath || ++cargoOpenCount !== 2) return handle;
+
+      const originalRead = handle.read.bind(handle) as (
+        buffer: Uint8Array,
+        offset: number,
+        length: number,
+        position: number | null
+      ) => Promise<{ bytesRead: number; buffer: Uint8Array }>;
+      const interceptedRead = async (
+        buffer: Uint8Array,
+        offset: number,
+        length: number,
+        position: number | null
+      ) => {
+        const result = await originalRead(buffer, offset, length, position);
+        if (result.bytesRead === 0 && !changedInPlace) {
+          const writer = await originalOpen(cargoPath, "r+");
+          try {
+            await writer.write(Buffer.from("x"), 0, 1, maxCargoManifestBytes - 1);
+          } finally {
+            await writer.close();
+          }
+          changedInPlace = true;
+        }
+        return result;
+      };
+
+      return new Proxy(handle, {
+        get(targetHandle, property) {
+          if (property === "read") return interceptedRead;
+          const value = Reflect.get(targetHandle, property, targetHandle);
+          return typeof value === "function" ? value.bind(targetHandle) : value;
+        }
+      });
+    });
+
+    const lintCriterion = await getPolicyCriterion("lint-config");
+    await expect(lintCriterion.check(createPolicyContext(repoPath))).resolves.toMatchObject({
+      status: "fail"
+    });
+    expect(changedInPlace).toBe(true);
+    await expect(fs.stat(cargoPath)).resolves.toMatchObject({ size: maxCargoManifestBytes });
+  });
+
   it("rejects evidence beneath a symlinked repository directory", async () => {
     const repoPath = await copyFixture("minimal-rust");
     const externalDirectory = path.join(path.dirname(repoPath), "external-cargo-config");

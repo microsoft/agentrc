@@ -130,6 +130,12 @@ function hasSameIdentity(left, right) {
   );
 }
 
+function hasSameReadMetadata(left, right) {
+  return (
+    left.size === right.size && left.mtimeNs === right.mtimeNs && left.ctimeNs === right.ctimeNs
+  );
+}
+
 async function hasUnchangedSafePath(opened) {
   const inspected = await inspectSafeFixedPath(opened.repoPath, opened.candidate);
   return Boolean(inspected && hasSameIdentity(opened.stats, inspected.stats));
@@ -198,6 +204,7 @@ async function readSafeCargoManifest(repoPath) {
       !finalStats.isFile() ||
       finalStats.size > BigInt(MAX_CARGO_MANIFEST_BYTES) ||
       !hasSameIdentity(opened.stats, finalStats) ||
+      !hasSameReadMetadata(opened.stats, finalStats) ||
       !(await hasUnchangedSafePath(opened))
     ) {
       return undefined;
