@@ -3,6 +3,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import type { PolicyConfig } from "@agentrc/core/services/policy";
 import { loadPolicy } from "@agentrc/core/services/policy";
 import { isNativePlugin } from "@agentrc/core/services/policy/types";
@@ -13,7 +15,6 @@ import type {
   ReadinessReport
 } from "@agentrc/core/services/readiness";
 import { runReadinessReport } from "@agentrc/core/services/readiness";
-import { afterEach, describe, expect, it, vi } from "vitest";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "../../..");
