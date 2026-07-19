@@ -298,8 +298,8 @@ async function rustLockfileResult(context) {
 }
 
 async function rustOnlyResult(context, candidates, title) {
-  if (!(await isRootRustRepository(context))) {
-    return { status: "skip", reason: "Not a root Rust repository." };
+  if (!(await isPureRustRepository(context))) {
+    return { status: "skip", reason: "Not a pure Rust repository." };
   }
 
   const evidence = await firstSafeFixedFile(context.repoPath, candidates);

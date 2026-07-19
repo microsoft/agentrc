@@ -436,6 +436,12 @@ describe("Rust readiness policy", () => {
     for (const id of ["lint-config", "format-config", "typecheck-config", "lockfile"] as const) {
       expect(getCriterion(policyReport, id)).toEqual(getCriterion(baseline, id));
     }
+    for (const id of customIds) {
+      expectRustCriterion(policyReport, id, {
+        status: "skip",
+        reason: "Not a pure Rust repository."
+      });
+    }
   });
 
   it("keeps non-Rust Node and Python reports structurally identical after normalization", async () => {
