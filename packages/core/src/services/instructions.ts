@@ -198,15 +198,19 @@ export function buildRootContextSection(rootContent?: string): string {
  * Returns the content unchanged when no "Copilot Instructions" heading is present.
  */
 export function normalizeAgentsHeading(content: string, componentName?: string): string {
-  const headingRe = /^#\s+Copilot Instructions(?:\s*:\s*(.*))?\s*$/imu;
-  const match = headingRe.exec(content);
+  // Only consider the first line as the document's top-level heading.
+  const headingRe = /^(?:\uFEFF)?#\s+Copilot Instructions(?:\s*:\s*(.*))?\s*$/iu;
+  const firstLineEnd = content.indexOf("\n");
+  const firstLine = (firstLineEnd === -1 ? content : content.slice(0, firstLineEnd)).trimEnd();
+  const match = headingRe.exec(firstLine);
   if (!match) return content;
 
   const fallback = match[1]?.trim();
   const heading = componentName?.trim() || fallback;
   if (!heading) return content;
 
-  return content.replace(headingRe, `# ${heading}`);
+  const replacedFirstLine = firstLine.replace(headingRe, `# ${heading}`);
+  return firstLineEnd === -1 ? replacedFirstLine : `${replacedFirstLine}\n${content.slice(firstLineEnd + 1)}`;
 }
 
 /**
