@@ -75,6 +75,10 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
   try {
     const dryRunFiles: { path: string; bytes: number }[] = [];
 
+    // Root instruction content, propagated to per-area generation so area/crate
+    // files don't duplicate what the root file already covers.
+    let rootContent: string | undefined;
+
     // Generate root instructions unless --areas-only
     if (!options.areasOnly && !options.area) {
       if (strategy === "nested") {
@@ -88,6 +92,7 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
             detailDir,
             claudeMd
           });
+          rootContent = nestedResult.hub.content;
           if (options.dryRun) {
             const dryFiles = [
               { path: nestedResult.hub.relativePath, content: nestedResult.hub.content },
@@ -283,7 +288,8 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
               model: options.model,
               onProgress: shouldLog(options) ? (msg) => progress.update(msg) : undefined,
               detailDir,
-              claudeMd
+              claudeMd,
+              rootContent
             });
             if (options.dryRun) {
               const dryFiles = [
