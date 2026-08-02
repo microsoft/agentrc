@@ -191,6 +191,25 @@ export function buildRootContextSection(rootContent?: string): string {
 }
 
 /**
+ * Normalize the top-level heading of generated AGENTS.md content so it matches
+ * the file type instead of leaking copilot-instructions.md conventions.
+ * Rewrites "# Copilot Instructions: <name>" → "# <name>" using the provided
+ * component name (area/crate) when available, otherwise the name in the heading.
+ * Returns the content unchanged when no "Copilot Instructions" heading is present.
+ */
+export function normalizeAgentsHeading(content: string, componentName?: string): string {
+  const headingRe = /^#\s+Copilot Instructions(?:\s*:\s*(.*))?\s*$/imu;
+  const match = headingRe.exec(content);
+  if (!match) return content;
+
+  const fallback = match[1]?.trim();
+  const heading = componentName?.trim() || fallback;
+  if (!heading) return content;
+
+  return content.replace(headingRe, `# ${heading}`);
+}
+
+/**
  * Strip outer markdown code fences that LLMs sometimes wrap around generated file content.
  * Only removes a single outer fence (```markdown or bare ```) — internal fences are preserved.
  */
@@ -939,10 +958,15 @@ export async function generateNestedInstructions(
     const basePath = options.area?.path ?? ".";
     const hubRelativePath = path.join(basePath, "AGENTS.md");
 
+    // Normalize the heading so generated AGENTS.md files don't carry a
+    // copilot-instructions.md title (e.g. "# Copilot Instructions: <crate> crate").
+    const componentName = options.area?.name ?? path.basename(options.repoPath);
+    const normalizedHubContent = normalizeAgentsHeading(hubContent, componentName);
+
     // Hub content: prepend frontmatter if area-scoped
-    let finalHubContent = hubContent;
+    let finalHubContent = normalizedHubContent;
     if (options.area) {
-      finalHubContent = `${buildAreaFrontmatter(options.area)}\n\n${hubContent}`;
+      finalHubContent = `${buildAreaFrontmatter(options.area)}\n\n${normalizedHubContent}`;
     }
 
     const result: NestedInstructionsResult = {
