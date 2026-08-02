@@ -9,6 +9,7 @@ import {
   generateAreaInstructions,
   generateCopilotInstructions,
   generateNestedInstructions,
+  generateNestedAreaInstructions,
   writeAreaInstruction,
   writeInstructionFile,
   writeNestedInstructions,
@@ -17,6 +18,8 @@ import {
   areaInstructionPath,
   detectExistingInstructions,
   buildExistingInstructionsSection,
+  buildRootContextSection,
+  normalizeAgentsHeading,
   parseTopicsFromHub,
   stripMarkdownFences
 } from "@agentrc/core/services/instructions";
@@ -431,6 +434,23 @@ describe("buildExistingInstructionsSection", () => {
   });
 });
 
+describe("buildRootContextSection", () => {
+  it("returns empty string when no root content is provided", () => {
+    expect(buildRootContextSection()).toBe("");
+    expect(buildRootContextSection("")).toBe("");
+    expect(buildRootContextSection("   ")).toBe("");
+  });
+
+  it("embeds the root content under a do-not-repeat header", () => {
+    const root = "# Monorepo\n\nWorkspace crates use `{ workspace = true }`.";
+    const section = buildRootContextSection(root);
+    expect(section).toContain("## Root instructions already cover");
+    expect(section).toContain("Do NOT repeat or restate it");
+    expect(section).toContain("# Monorepo");
+    expect(section).toContain("`{ workspace = true }`");
+  });
+});
+
 describe("writeInstructionFile", () => {
   let tmpDir: string;
 
@@ -736,6 +756,29 @@ describe("stripMarkdownFences", () => {
   it("handles empty content", () => {
     expect(stripMarkdownFences("")).toBe("");
     expect(stripMarkdownFences("  ")).toBe("");
+  });
+});
+
+describe("normalizeAgentsHeading", () => {
+  it("returns content unchanged when no Copilot Instructions heading is present", () => {
+    const content = "# git crate\n\nBody.";
+    expect(normalizeAgentsHeading(content, "git")).toBe(content);
+  });
+
+  it("rewrites the heading to the component name", () => {
+    expect(normalizeAgentsHeading("# Copilot Instructions: git crate", "git")).toBe("# git");
+  });
+
+  it("falls back to the name embedded in the heading when no component name", () => {
+    expect(normalizeAgentsHeading("# Copilot Instructions: git crate")).toBe("# git crate");
+  });
+
+  it("matches the heading case-insensitively", () => {
+    expect(normalizeAgentsHeading("# copilot instructions: git crate", "git")).toBe("# git");
+  });
+
+  it("returns content unchanged when heading has no name and no component name", () => {
+    expect(normalizeAgentsHeading("# Copilot Instructions")).toBe("# Copilot Instructions");
   });
 });
 
@@ -1050,5 +1093,43 @@ describe("instruction generation sessions", () => {
         claudeMd: false
       })
     ).rejects.toThrow("Copilot CLI not logged in. Run `copilot` then `/login` to authenticate.");
+  });
+
+  it("propagates root content and normalizes headings for nested area generation", async () => {
+    const area: Area = {
+      name: "git",
+      applyTo: "crates/git/**",
+      path: path.join(tmpDir, "crates", "git"),
+      source: "auto"
+    };
+    const hub = createMockSession();
+    const { createSession } = mockClient([hub.session]);
+    mockSdkTools();
+
+    const rootContent = "# Monorepo\n\nWorkspace crates use `{ workspace = true }`.";
+    let sentPrompt = "";
+
+    hub.session.sendAndWait.mockImplementation(async (args: { prompt: string }) => {
+      sentPrompt = args.prompt;
+      const [config] = createSession.mock.calls[0] as unknown as [
+        { tools: Array<{ handler: Function }> }
+      ];
+      await config.tools[0].handler({
+        content: "```markdown\n# Copilot Instructions: git crate\n\nCrate-specific.\n```"
+      });
+    });
+
+    const result = await generateNestedAreaInstructions({
+      repoPath: tmpDir,
+      area,
+      detailDir: ".agents",
+      claudeMd: false,
+      rootContent
+    });
+
+    expect(result.hub.content).toContain("# git");
+    expect(result.hub.content).not.toContain("Copilot Instructions");
+    expect(sentPrompt).toContain("## Root instructions already cover");
+    expect(sentPrompt).toContain("Workspace crates use `{ workspace = true }`");
   });
 });

@@ -80,6 +80,39 @@ describe("generateConfigs", () => {
     expect(reviewText).toContain("repo conventions");
   });
 
+  it("references the selected instruction file in vscode settings", async () => {
+    const analysis = makeAnalysis();
+    await generateConfigs({
+      repoPath: tmpDir,
+      analysis,
+      selections: ["vscode"],
+      force: false,
+      instructionFile: "AGENTS.md"
+    });
+
+    const content = await fs.readFile(path.join(tmpDir, ".vscode", "settings.json"), "utf8");
+    const parsed = JSON.parse(content);
+    expect(parsed["github.copilot.chat.codeGeneration.instructions"]).toEqual([
+      { file: "AGENTS.md" }
+    ]);
+  });
+
+  it("defaults vscode settings to .github/copilot-instructions.md", async () => {
+    const analysis = makeAnalysis();
+    await generateConfigs({
+      repoPath: tmpDir,
+      analysis,
+      selections: ["vscode"],
+      force: false
+    });
+
+    const content = await fs.readFile(path.join(tmpDir, ".vscode", "settings.json"), "utf8");
+    const parsed = JSON.parse(content);
+    expect(parsed["github.copilot.chat.codeGeneration.instructions"]).toEqual([
+      { file: ".github/copilot-instructions.md" }
+    ]);
+  });
+
   it("skips existing files without force", async () => {
     await fs.mkdir(path.join(tmpDir, ".vscode"), { recursive: true });
     await fs.writeFile(path.join(tmpDir, ".vscode", "mcp.json"), "original", "utf8");
