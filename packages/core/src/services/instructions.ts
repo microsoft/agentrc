@@ -171,6 +171,26 @@ export function buildExistingInstructionsSection(ctx: ExistingInstructionsContex
 }
 
 /**
+ * Build a prompt section embedding the freshly-generated root instruction content
+ * so nested (per-area / per-crate) generation knows what the root file already
+ * covers and avoids restating it. Emits nothing when no root content is provided.
+ */
+export function buildRootContextSection(rootContent?: string): string {
+  const trimmed = rootContent?.trim();
+  if (!trimmed) return "";
+
+  return [
+    "",
+    "## Root instructions already cover",
+    "The root instruction file already covers the following workspace-wide content. " +
+      "Do NOT repeat or restate it in this file; cover only this area/crate's unique details:",
+    "",
+    trimmed,
+    ""
+  ].join("\n");
+}
+
+/**
  * Strip outer markdown code fences that LLMs sometimes wrap around generated file content.
  * Only removes a single outer fence (```markdown or bare ```) — internal fences are preserved.
  */
@@ -294,6 +314,8 @@ type GenerateInstructionsOptions = {
   strategy?: InstructionStrategy;
   detailDir?: string;
   claudeMd?: boolean;
+  /** Content of the already-generated root instruction file, used to avoid duplicating it in nested outputs. */
+  rootContent?: string;
 };
 
 export async function generateCopilotInstructions(
@@ -392,6 +414,8 @@ type GenerateAreaInstructionsOptions = {
   strategy?: InstructionStrategy;
   detailDir?: string;
   claudeMd?: boolean;
+  /** Content of the already-generated root instruction file, used to avoid duplicating it in area outputs. */
+  rootContent?: string;
 };
 
 export async function generateAreaInstructions(
@@ -700,6 +724,7 @@ async function generateNestedHub(
     childAreas?: Area[];
     model?: string;
     onProgress?: (message: string) => void;
+    rootContent?: string;
   }
 ): Promise<HubResult> {
   const progress = options.onProgress ?? (() => {});
@@ -763,12 +788,13 @@ async function generateNestedHub(
     : "";
 
   // Invoke the nested-hub skill with repo/area-specific context
+  const rootContextSection = buildRootContextSection(options.rootContent);
   const prompt = `/nested-hub Generate a lean AGENTS.md hub file (~90-120 lines).${areaContext}${parentContext}
 
 Detail files go in \`${options.detailDir}/\`.${childContext}
 
 Recommend 3-5 topics for deep-dive detail files. Each slug becomes: \`${options.detailDir}/{slug}.md\`.
-${existingSection ? `\nDo NOT duplicate content from existing instruction files\n${existingSection}` : ""}`;
+${rootContextSection}${existingSection ? `\nDo NOT duplicate content from existing instruction files\n${existingSection}` : ""}`;
 
   let sendError: unknown;
   try {
@@ -800,6 +826,7 @@ async function generateNestedDetail(
     area?: Area;
     model?: string;
     onProgress?: (message: string) => void;
+    rootContent?: string;
   }
 ): Promise<string> {
   const progress = options.onProgress ?? (() => {});
@@ -848,8 +875,9 @@ async function generateNestedDetail(
     : "Focus on the entire repository.";
 
   // Invoke the nested-detail skill with topic-specific context
+  const rootContextSection = buildRootContextSection(options.rootContent);
   const prompt = `/nested-detail Generate a deep-dive instruction file about "${options.topic.title}" for this codebase.
-${areaContext}
+${areaContext}${rootContextSection}
 
 Topic: ${options.topic.title}
 Description: ${options.topic.description}`;
@@ -903,7 +931,8 @@ export async function generateNestedInstructions(
       area: options.area,
       childAreas: options.childAreas,
       model: options.model,
-      onProgress: options.onProgress
+      onProgress: options.onProgress,
+      rootContent: options.rootContent
     });
 
     // Determine output paths
@@ -931,7 +960,8 @@ export async function generateNestedInstructions(
           topic,
           area: options.area,
           model: options.model,
-          onProgress: options.onProgress
+          onProgress: options.onProgress,
+          rootContent: options.rootContent
         });
         if (detailContent) {
           result.details.push({
@@ -980,6 +1010,7 @@ export async function generateNestedAreaInstructions(
     model: options.model,
     onProgress: options.onProgress,
     detailDir: options.detailDir,
-    claudeMd: options.claudeMd
+    claudeMd: options.claudeMd,
+    rootContent: options.rootContent
   });
 }
