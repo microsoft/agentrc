@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- **Batch Instructions honors nested strategy** — the VS Code "Batch Instructions" command now generates hub + detail files (`.agents/*.md`, optional `CLAUDE.md`) for repositories configured with `strategy: "nested"` instead of a single flat `AGENTS.md` (#58)
+
 - **Config scaffolding for simple repos** — `agentrc init` and the TUI now create `agentrc.config.json` even when no areas are detected, producing a minimal `{}` stub. Previously failed with "No areas detected. Cannot scaffold agentrc.config.json."
 
 ## [2.1.0]
