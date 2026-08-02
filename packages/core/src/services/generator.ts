@@ -20,6 +20,8 @@ export type GenerateOptions = {
   selections: string[];
   force: boolean;
   dryRun?: boolean;
+  /** Relative path of the generated instruction file referenced by VS Code settings. Defaults to `.github/copilot-instructions.md`. */
+  instructionFile?: string;
 };
 
 async function writeOrPreview(
@@ -58,7 +60,7 @@ export async function generateConfigs(options: GenerateOptions): Promise<Generat
     files.push(
       await writeOrPreview(
         path.join(repoPath, ".vscode", "settings.json"),
-        renderVscodeSettings(analysis),
+        renderVscodeSettings(analysis, options.instructionFile),
         { dryRun, force }
       )
     );
@@ -96,16 +98,17 @@ function renderMcp(): string {
   );
 }
 
-function renderVscodeSettings(analysis: RepoAnalysis): string {
+function renderVscodeSettings(
+  analysis: RepoAnalysis,
+  instructionFile = ".github/copilot-instructions.md"
+): string {
   const reviewFocus = analysis.frameworks.length
     ? `Focus on ${analysis.frameworks.join(", ")} best practices and repo conventions.`
     : "Focus on repo conventions and maintainability.";
 
   return JSON.stringify(
     {
-      "github.copilot.chat.codeGeneration.instructions": [
-        { file: ".github/copilot-instructions.md" }
-      ],
+      "github.copilot.chat.codeGeneration.instructions": [{ file: instructionFile }],
       "github.copilot.chat.reviewSelection.instructions": [{ text: reviewFocus }],
       "chat.promptFiles": true,
       "chat.mcp.enabled": true
