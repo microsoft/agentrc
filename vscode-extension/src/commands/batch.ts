@@ -60,7 +60,9 @@ export async function batchInstructionsCommand(): Promise<void> {
               wrote++;
             } else {
               skipped++;
-              reporter.update(`[${name}] Skipped: instruction files already exist`);
+              reporter.update(
+                `[${name}] Skipped: no files written (${Array.from(new Set(actions.map((a) => a.action))).join(", ")})`
+              );
             }
 
             for (const warning of nestedResult.warnings) {
