@@ -1,9 +1,7 @@
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
-import { fileURLToPath } from "url";
-
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { fileURLToPath, pathToFileURL } from "url";
 
 import type { PolicyConfig } from "@agentrc/core/services/policy";
 import { loadPolicy } from "@agentrc/core/services/policy";
@@ -15,6 +13,7 @@ import type {
   ReadinessReport
 } from "@agentrc/core/services/readiness";
 import { runReadinessReport } from "@agentrc/core/services/readiness";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "../../..");
@@ -22,6 +21,16 @@ const fixturesDirectory = path.join(testDirectory, "fixtures", "rust-policy");
 const policyPath = path.join(repositoryRoot, "examples", "policies", "rust.mjs");
 const strictPolicyPath = path.join(repositoryRoot, "examples", "policies", "strict.json");
 const maxCargoManifestBytes = 1024 * 1024;
+
+interface IdentityStats {
+  ctimeNs: bigint;
+  dev: bigint;
+  ino: bigint;
+  mode: bigint;
+  mtimeNs: bigint;
+  nlink: bigint;
+  size: bigint;
+}
 
 const replacementIds = [
   "lint-config",
@@ -132,6 +141,28 @@ async function writeText(
   const target = path.join(root, relativePath);
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, content);
+}
+
+async function loadIdentityComparator(
+  hasNofollow: boolean
+): Promise<(left: IdentityStats, right: IdentityStats) => boolean> {
+  const parent = await fs.mkdtemp(path.join(os.tmpdir(), "agentrc-rust-policy-identity-"));
+  const variantPath = path.join(parent, `rust-${hasNofollow ? "nofollow" : "fallback"}.mjs`);
+  temporaryRoots.add(parent);
+
+  const source = await fs.readFile(policyPath, "utf8");
+  const variant = source
+    .replace(
+      'const HAS_NOFOLLOW = typeof fsConstants.O_NOFOLLOW === "number";',
+      `const HAS_NOFOLLOW = ${hasNofollow};`
+    )
+    .replace("\nexport default {", "\nexport { hasSameIdentity };\n\nexport default {");
+  await fs.writeFile(variantPath, variant);
+
+  const loaded = (await import(pathToFileURL(variantPath).href)) as {
+    hasSameIdentity: (left: IdentityStats, right: IdentityStats) => boolean;
+  };
+  return loaded.hasSameIdentity;
 }
 
 async function runPolicyReport(
@@ -499,6 +530,28 @@ describe("Rust readiness policy", () => {
     await writeText(repoPath, "Cargo.toml", new Uint8Array([0, 1, 2, 3]));
     await expect(runPolicyReport(repoPath)).resolves.toBeDefined();
   });
+
+  it.each([
+    [true, true],
+    [false, false]
+  ])(
+    "handles zero device and inode values when HAS_NOFOLLOW is %s",
+    async (hasNofollow, expected) => {
+      const hasSameIdentity = await loadIdentityComparator(hasNofollow);
+      const stats: IdentityStats = {
+        ctimeNs: 4n,
+        dev: 0n,
+        ino: 0n,
+        mode: 0o100644n,
+        mtimeNs: 3n,
+        nlink: 1n,
+        size: 2n
+      };
+
+      expect(hasSameIdentity(stats, { ...stats })).toBe(expected);
+      expect(hasSameIdentity(stats, { ...stats, nlink: 2n })).toBe(false);
+    }
+  );
 
   it("fails closed if Cargo.toml becomes a symlink between inspection and open", async () => {
     const repoPath = await copyFixture("minimal-rust");

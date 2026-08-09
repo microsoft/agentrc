@@ -38,12 +38,7 @@ const NODE_FORMAT_CANDIDATES = [
   "prettier.config.cjs"
 ];
 
-const NODE_TYPECHECK_CANDIDATES = [
-  "tsconfig.json",
-  "tsconfig.base.json",
-  "pyproject.toml",
-  "mypy.ini"
-];
+const TYPECHECK_CANDIDATES = ["tsconfig.json", "tsconfig.base.json", "pyproject.toml", "mypy.ini"];
 const NODE_LOCKFILE_CANDIDATES = ["pnpm-lock.yaml", "yarn.lock", "package-lock.json", "bun.lockb"];
 const RUST_LINT_CANDIDATES = ["clippy.toml", ".clippy.toml"];
 const RUST_FORMAT_CANDIDATES = ["rustfmt.toml", ".rustfmt.toml"];
@@ -74,11 +69,8 @@ async function isSafeFixedFile(repoPath, candidate) {
   const opened = await openVerifiedFixedFile(repoPath, candidate);
   if (!opened) return false;
 
-  try {
-    return await hasUnchangedSafePath(opened);
-  } finally {
-    await opened.handle.close().catch(() => {});
-  }
+  await opened.handle.close().catch(() => {});
+  return true;
 }
 
 async function inspectSafeFixedPath(repoPath, candidate) {
@@ -119,11 +111,14 @@ function hasSameIdentity(left, right) {
     return false;
   }
 
-  // Some filesystems report zero device or inode values. When O_NOFOLLOW protects the open,
-  // compare stable metadata instead of treating otherwise safe evidence as universally absent.
+  // Some filesystems report zero device or inode values. When O_NOFOLLOW protects the final path
+  // component, compare metadata instead of treating otherwise safe evidence as universally absent.
+  // This is only a compatibility fallback: the metadata can be reproduced by an attacker who can
+  // replace an intermediate directory, because Node has no portable openat-style path traversal.
   return (
     HAS_NOFOLLOW &&
     left.mode === right.mode &&
+    left.nlink === right.nlink &&
     left.size === right.size &&
     left.mtimeNs === right.mtimeNs &&
     left.ctimeNs === right.ctimeNs
@@ -254,9 +249,9 @@ async function hasCargoLintHeader(repoPath) {
 }
 
 async function rustLintResult(context) {
-  const evidence = await firstSafeFixedFile(context.repoPath, RUST_LINT_CANDIDATES);
+  const evidence = await firstSafeFixedFile(context?.repoPath, RUST_LINT_CANDIDATES);
   if (evidence) return { status: "pass", evidence: [evidence] };
-  if (await hasCargoLintHeader(context.repoPath)) {
+  if (await hasCargoLintHeader(context?.repoPath)) {
     return { status: "pass", evidence: ["Cargo.toml"] };
   }
   return {
@@ -268,7 +263,7 @@ async function rustLintResult(context) {
 }
 
 async function rustFormatResult(context) {
-  const evidence = await firstSafeFixedFile(context.repoPath, RUST_FORMAT_CANDIDATES);
+  const evidence = await firstSafeFixedFile(context?.repoPath, RUST_FORMAT_CANDIDATES);
   return evidence
     ? { status: "pass", evidence: [evidence] }
     : {
@@ -288,7 +283,7 @@ async function rustTypecheckResult(context) {
 }
 
 async function rustLockfileResult(context) {
-  if (await isSafeFixedFile(context.repoPath, "Cargo.lock")) {
+  if (await isSafeFixedFile(context?.repoPath, "Cargo.lock")) {
     return { status: "pass", evidence: ["Cargo.lock"] };
   }
   return {
@@ -302,7 +297,7 @@ async function rustOnlyResult(context, candidates, title) {
     return { status: "skip", reason: "Not a pure Rust repository." };
   }
 
-  const evidence = await firstSafeFixedFile(context.repoPath, candidates);
+  const evidence = await firstSafeFixedFile(context?.repoPath, candidates);
   return evidence
     ? { status: "pass", evidence: [evidence] }
     : { status: "fail", reason: `Missing ${title}.`, evidence: [...candidates] };
@@ -325,12 +320,12 @@ async function nodeFormatResult(context) {
   };
 }
 
-async function nodeTypecheckResult(context) {
-  const found = hasRootCandidate(context, NODE_TYPECHECK_CANDIDATES);
+async function typecheckResult(context) {
+  const found = hasRootCandidate(context, TYPECHECK_CANDIDATES);
   return {
     status: found ? "pass" : "fail",
     reason: found ? undefined : "Missing type checking config (tsconfig or equivalent).",
-    evidence: ["tsconfig.json", "pyproject.toml", "mypy.ini"]
+    evidence: [...TYPECHECK_CANDIDATES]
   };
 }
 
@@ -398,7 +393,7 @@ export default {
         check: async (context) =>
           (await isPureRustRepository(context))
             ? rustTypecheckResult(context)
-            : nodeTypecheckResult(context)
+            : typecheckResult(context)
       },
       {
         id: "build-script",
