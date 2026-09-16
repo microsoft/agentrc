@@ -20,14 +20,15 @@ Output is CommonJS (not ESM like the CLI). Bundled with esbuild, not tsup.
 
 ## Service Reuse via Path Alias
 
-The extension imports CLI services through a `agentrc/*` path alias:
+The extension imports shared services through the `@agentrc/core/*` path alias:
 
 ```typescript
 // vscode-extension/src/services.ts — re-export layer
-export { analyzeRepo } from "agentrc/services/analyzer.js";
+export { analyzeRepo } from "@agentrc/core/services/analyzer";
 ```
 
-This works because `tsconfig.json` maps `"agentrc/*": ["../src/*"]` and esbuild resolves it at bundle time. Never duplicate CLI service logic in the extension.
+This works because `tsconfig.json` maps `@agentrc/core` to `../packages/core/src` and esbuild
+resolves it at bundle time. Never duplicate core service logic in the extension.
 
 ## Git Integration
 

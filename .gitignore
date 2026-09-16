@@ -10,6 +10,15 @@ coverage/
 .vscode/
 .idea/
 
+# Local agent integrations
+.agents/
+.opencode/
+.claude/
+.serena/
+
+# Local specification artifacts
+specs/
+
 # OS
 .DS_Store
 Thumbs.db

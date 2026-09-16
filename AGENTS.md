@@ -21,7 +21,7 @@ vscode-extension/      # See .github/instructions/vscode-extension.instructions.
 ## Build & Test
 
 ```sh
-npm run build          # tsup → dist/index.js (ESM, Node 20)
+npm run build          # tsup → dist/index.js (ESM, Node 22+)
 npm run dev            # tsx src/index.ts (run from source)
 npm run typecheck      # tsc --noEmit
 npm run lint           # eslint

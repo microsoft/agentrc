@@ -2,6 +2,9 @@
 *.lock.yml
 .github/workflows/agentics-maintenance.yml
 
+# Generated SpecKit skills are integration-managed and read-only in local workspaces
+.agents/
+
 # Webapp has its own formatting; Dockerfile is not parseable by Prettier
 webapp/
 Dockerfile.webapp

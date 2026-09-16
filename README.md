@@ -18,7 +18,7 @@ AgentRC reads your codebase and generates the files that close that gap — then
 npx github:microsoft/agentrc
 ```
 
-Works as a CLI, as a [VS Code extension](docs/extension.md), and in your [CI/CD pipeline](docs/ci-integration.md) to monitor drift. No config needed — runs on any repo with Node.js 20+.
+Works as a CLI, as a [VS Code extension](docs/extension.md), and in your [CI/CD pipeline](docs/ci-integration.md) to monitor drift. No config needed — runs on any repo with Node.js 22+.
 
 ![AgentRC — Measure, Generate, Maintain cycle](docs/assets/agentrc-overview.png)
 

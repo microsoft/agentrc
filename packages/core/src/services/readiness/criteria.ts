@@ -57,7 +57,7 @@ export function buildCriteria(): ReadinessCriterion[] {
         return {
           status: found ? "pass" : "fail",
           reason: found ? undefined : "Missing type checking config (tsconfig or equivalent).",
-          evidence: ["tsconfig.json", "pyproject.toml", "mypy.ini"]
+          evidence: ["tsconfig.json", "tsconfig.base.json", "pyproject.toml", "mypy.ini"]
         };
       }
     },
