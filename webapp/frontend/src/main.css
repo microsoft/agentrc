@@ -282,6 +282,9 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: 8px;
 }
+.progress-area[hidden] {
+  display: none;
+}
 
 .spinner {
   display: inline-block;
