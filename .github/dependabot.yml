@@ -28,3 +28,5 @@ updates:
       # update gh-aw action pins directly.
       - dependency-name: "github/gh-aw-actions/*"
       - dependency-name: "github/gh-aw/*"
+    cooldown:
+      default-days: 7

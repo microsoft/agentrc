@@ -24,8 +24,8 @@ jobs:
   test-backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "24"
           cache: npm
@@ -40,8 +40,8 @@ jobs:
   test-frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "24"
           cache: npm
@@ -57,18 +57,18 @@ jobs:
     permissions:
       security-events: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Build Docker image
         run: docker build -f Dockerfile.webapp -t agentrc-webapp:test .
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: agentrc-webapp:test
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         if: always()
         with:
           sarif_file: trivy-results.sarif
