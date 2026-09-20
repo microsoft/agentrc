@@ -48,6 +48,22 @@ Context goes stale as your codebase evolves. Evaluate whether your instructions 
 npx github:microsoft/agentrc eval
 ```
 
+## AgentRC maintains itself with GitHub Agentic Workflows
+
+This repository dogfoods [GitHub Agentic Workflows](https://github.github.com/gh-aw/) for recurring maintenance and demos:
+
+| Workflow                                                                    | Purpose                                                                   | Output                         |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------ |
+| [AgentRC Readiness Report](.github/workflows/agentrc-readiness-report.md)   | Runs AgentRC against this repository and explains the highest-impact gaps | One short-lived issue          |
+| [AgentRC Readiness Upgrade](.github/workflows/agentrc-readiness-upgrade.md) | Improves one evidence-backed instruction and verifies the result          | One draft PR                   |
+| [Issue Triage](.github/workflows/issue-triage.md)                           | Classifies new issues and asks for missing information                    | Bounded labels and one comment |
+| [CI Failure Doctor](.github/workflows/ci-doctor.md)                         | Diagnoses failed CI from logs and repository changes                      | One issue or one comment       |
+| [Weekly Repository Status](.github/workflows/weekly-repo-status.md)         | Summarizes delivery, quality, and automation health                       | One expiring weekly issue      |
+
+The source workflows are Markdown. `gh aw compile` generates the reviewable `.lock.yml` workflows that GitHub Actions executes. CI fails when those generated files drift.
+
+See [Agentic Workflows](docs/agentic-workflows.md) for the architecture, maintenance commands, safety model, and a five-minute live demo.
+
 ## Works at every scale
 
 | Workflow                  | Command                                   |
@@ -85,18 +101,19 @@ The `.instructions.md` format is shared by both tools — no conversion needed w
 
 ## Documentation
 
-|                                                |                                                         |
-| ---------------------------------------------- | ------------------------------------------------------- |
-| **[Getting Started](docs/getting-started.md)** | Prerequisites and first run                             |
-| **[Concepts](docs/concepts.md)**               | Maturity model, readiness pillars, how generation works |
-| **[Commands](docs/commands.md)**               | Full CLI reference                                      |
-| **[Configuration](docs/configuration.md)**     | Areas, workspaces, monorepos                            |
-| **[Policies](docs/policies.md)**               | Custom readiness scoring                                |
-| **[At Scale](docs/at-scale.md)**               | Batch processing across orgs                            |
-| **[CI Integration](docs/ci-integration.md)**   | GitHub Actions & Azure Pipelines                        |
-| **[VS Code Extension](docs/extension.md)**     | Sidebar views, commands, settings                       |
-| **[Agent Plugin](plugin/README.md)**           | Install as a Copilot agent plugin with built-in skills  |
-| **[Examples](examples/)**                      | Configs, evals, and policies                            |
+|                                                    |                                                         |
+| -------------------------------------------------- | ------------------------------------------------------- |
+| **[Getting Started](docs/getting-started.md)**     | Prerequisites and first run                             |
+| **[Concepts](docs/concepts.md)**                   | Maturity model, readiness pillars, how generation works |
+| **[Commands](docs/commands.md)**                   | Full CLI reference                                      |
+| **[Configuration](docs/configuration.md)**         | Areas, workspaces, monorepos                            |
+| **[Policies](docs/policies.md)**                   | Custom readiness scoring                                |
+| **[At Scale](docs/at-scale.md)**                   | Batch processing across orgs                            |
+| **[CI Integration](docs/ci-integration.md)**       | GitHub Actions & Azure Pipelines                        |
+| **[VS Code Extension](docs/extension.md)**         | Sidebar views, commands, settings                       |
+| **[Agent Plugin](plugin/README.md)**               | Install as a Copilot agent plugin with built-in skills  |
+| **[Agentic Workflows](docs/agentic-workflows.md)** | Dogfooding, maintenance, and live demo guide            |
+| **[Examples](examples/)**                          | Configs, evals, and policies                            |
 
 [Customize AI in VS Code](https://code.visualstudio.com/docs/copilot/customization/overview) · [Custom instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) · [CONTRIBUTING.md](CONTRIBUTING.md)
 

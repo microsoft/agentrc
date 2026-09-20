@@ -1,6 +1,8 @@
 # Auto-generated gh-aw lock files
 *.lock.yml
 .github/workflows/agentics-maintenance.yml
+.github/agents/agentic-workflows.md
+.github/skills/agentic-workflows/SKILL.md
 
 # Webapp has its own formatting; Dockerfile is not parseable by Prettier
 webapp/
