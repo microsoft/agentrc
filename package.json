@@ -25,7 +25,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "workflows:compile": "gh aw compile --fix --approve --actionlint --no-check-update",
-    "workflows:check": "gh aw compile --fail-fast --no-check-update && git diff --exit-code -- .gitattributes .github/aw .github/workflows"
+    "workflows:check": "gh aw compile --fail-fast --actionlint --no-check-update && git diff --exit-code -- .gitattributes .github/aw .github/workflows"
   },
   "keywords": [],
   "author": "",

@@ -20,6 +20,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: raven-actions/actionlint@v2
         with:
+          files: ".github/workflows/ci.yml,.github/workflows/eval.yml,.github/workflows/webapp-cd.yml,.github/workflows/webapp-ci.yml"
           flags: "-ignore SC2015 -ignore SC2086 -ignore string.should.not.be.empty"
 
   validate-agentic-workflows:
