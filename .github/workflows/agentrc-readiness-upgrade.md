@@ -10,8 +10,6 @@ on:
 
 permissions:
   contents: read
-  issues: read
-  pull-requests: read
   copilot-requests: write
 
 concurrency:
@@ -30,10 +28,8 @@ network:
 
 tools:
   edit:
-  github:
-    toolsets: [default]
   bash:
-    - "cat /tmp/gh-aw/agent/readiness-before.json"
+    - "cat /tmp/gh-aw/agent/readiness-before.md"
     - "cat AGENTS.md"
     - "find .github/instructions -name"
     - "git diff"
@@ -75,9 +71,8 @@ steps:
     run: |
       mkdir -p /tmp/gh-aw/agent
       node dist/index.js readiness \
-        --output /tmp/gh-aw/agent/readiness-before.json \
-        --force \
-        --json
+        --output /tmp/gh-aw/agent/readiness-before.md \
+        --force
 ---
 
 # Improve AgentRC's Own Instructions
@@ -88,7 +83,7 @@ Demonstrate the AgentRC loop on this repository:
 
 ## Guardrails
 
-- Read `/tmp/gh-aw/agent/readiness-before.json` before proposing a change.
+- Read `/tmp/gh-aw/agent/readiness-before.md` before proposing a change.
 - Change only `AGENTS.md`, `.github/copilot-instructions.md`, or one scoped
   `.github/instructions/*.instructions.md` file.
 - Do not modify product code, workflow definitions, package manifests, lock
@@ -106,9 +101,8 @@ Demonstrate the AgentRC loop on this repository:
 
    ```bash
    node dist/index.js readiness \
-     --output /tmp/gh-aw/agent/readiness-after.json \
-     --force \
-     --json
+     --output /tmp/gh-aw/agent/readiness-after.md \
+     --force
    npm run format:check
    ```
 
@@ -117,6 +111,9 @@ Demonstrate the AgentRC loop on this repository:
    used instead.
 6. If no justified improvement exists, use `noop`.
 7. Otherwise create one draft PR.
+
+Call the `create_pull_request` or `noop` safe-output tool directly. Do not
+construct a shell command for safe outputs.
 
 ## Pull request requirements
 

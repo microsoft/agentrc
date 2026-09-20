@@ -10,10 +10,7 @@ on:
   stop-after: +6mo
 
 permissions:
-  actions: read
   contents: read
-  issues: read
-  pull-requests: read
   copilot-requests: write
 
 concurrency:
@@ -31,10 +28,8 @@ network:
   allowed: [defaults, node]
 
 tools:
-  github:
-    toolsets: [default, actions]
   bash:
-    - "cat /tmp/gh-aw/agent/readiness.json"
+    - "cat /tmp/gh-aw/agent/readiness.md"
 
 safe-outputs:
   create-issue:
@@ -60,25 +55,26 @@ steps:
     run: |
       mkdir -p /tmp/gh-aw/agent
       node dist/index.js readiness \
-        --output /tmp/gh-aw/agent/readiness.json \
-        --force \
-        --json
+        --output /tmp/gh-aw/agent/readiness.md \
+        --force
 ---
 
 # AgentRC Self-Readiness Report
 
 Use the deterministic AgentRC report at
-`/tmp/gh-aw/agent/readiness.json` as the source of truth. Do not rescore the
+`/tmp/gh-aw/agent/readiness.md` as the source of truth. Do not rescore the
 repository yourself.
 
 ## Task
 
 1. Read the report.
 2. Inspect repository files only to verify the highest-impact failed criteria.
-3. Compare relevant commits, issues, pull requests, and workflow runs from the
-   previous seven days using GitHub tools. Do not run Git commands through bash.
-4. Create one issue when there is a meaningful readiness gap or regression.
-5. Use `noop` when the report has no actionable change since the previous run.
+3. Create one issue when there is a meaningful readiness gap.
+4. Use `noop` when the report has no actionable gap.
+
+Call the `create_issue` or `noop` safe-output tool directly. Do not construct a
+shell command for safe outputs, parse the report with another program, or run
+Git commands.
 
 ## Issue format
 
