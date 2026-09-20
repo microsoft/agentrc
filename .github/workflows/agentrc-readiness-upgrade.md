@@ -34,8 +34,11 @@ tools:
     - "find .github/instructions -name"
     - "git diff"
     - "git status"
+    - "jq"
     - "node dist/index.js readiness"
     - "npm run format:check"
+    - "safeoutputs create_pull_request"
+    - "safeoutputs noop"
 
 safe-outputs:
   create-pull-request:
@@ -112,8 +115,7 @@ Demonstrate the AgentRC loop on this repository:
 6. If no justified improvement exists, use `noop`.
 7. Otherwise create one draft PR.
 
-Call the `create_pull_request` or `noop` safe-output tool directly. Do not
-construct a shell command for safe outputs.
+Submit the result with `safeoutputs create_pull_request` or `safeoutputs noop`.
 
 ## Pull request requirements
 

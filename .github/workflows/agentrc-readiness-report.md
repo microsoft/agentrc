@@ -30,6 +30,9 @@ network:
 tools:
   bash:
     - "cat /tmp/gh-aw/agent/readiness.md"
+    - "jq"
+    - "safeoutputs create_issue"
+    - "safeoutputs noop"
 
 safe-outputs:
   create-issue:
@@ -72,9 +75,8 @@ repository yourself.
 3. Create one issue when there is a meaningful readiness gap.
 4. Use `noop` when the report has no actionable gap.
 
-Call the `create_issue` or `noop` safe-output tool directly. Do not construct a
-shell command for safe outputs, parse the report with another program, or run
-Git commands.
+Submit the result with `safeoutputs create_issue` or `safeoutputs noop`. Do not
+run Git commands.
 
 ## Issue format
 
