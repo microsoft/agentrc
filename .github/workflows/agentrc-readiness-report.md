@@ -22,9 +22,9 @@ concurrency:
 
 engine: copilot
 strict: true
-max-ai-credits: 75
-max-daily-ai-credits: 100
-max-turns: 8
+max-ai-credits: 150
+max-daily-ai-credits: 300
+max-turns: 20
 timeout-minutes: 12
 
 network:
@@ -35,8 +35,6 @@ tools:
     toolsets: [default, actions]
   bash:
     - "cat /tmp/gh-aw/agent/readiness.json"
-    - "git log"
-    - "git status"
 
 safe-outputs:
   create-issue:
@@ -78,7 +76,7 @@ repository yourself.
 1. Read the report.
 2. Inspect repository files only to verify the highest-impact failed criteria.
 3. Compare relevant commits, issues, pull requests, and workflow runs from the
-   previous seven days.
+   previous seven days using GitHub tools. Do not run Git commands through bash.
 4. Create one issue when there is a meaningful readiness gap or regression.
 5. Use `noop` when the report has no actionable change since the previous run.
 
