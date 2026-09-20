@@ -68,15 +68,20 @@ Use the deterministic AgentRC report at
 `/tmp/gh-aw/agent/readiness.md` as the source of truth. Do not rescore the
 repository yourself.
 
-## Task
+## Execution contract
 
-1. Read the report.
-2. Inspect repository files only to verify the highest-impact failed criteria.
-3. Create one issue when there is a meaningful readiness gap.
-4. Use `noop` when the report has no actionable gap.
+Complete this workflow with exactly two tool calls:
 
-Submit the result with `safeoutputs create_issue` or `safeoutputs noop`. Do not
-run Git commands.
+1. Run `cat /tmp/gh-aw/agent/readiness.md`.
+2. Immediately submit the result with either `safeoutputs create_issue` or
+   `safeoutputs noop`.
+
+Do not inspect other repository files. Do not run Git commands. Do not use
+another program to parse or transform the report. The AgentRC output is already
+the complete evidence source.
+
+Create one issue when the report contains an actionable readiness gap. Use
+`safeoutputs noop` only when every criterion passes.
 
 ## Issue format
 
