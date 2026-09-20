@@ -36,7 +36,7 @@ safe-outputs:
       - help wanted
       - vscode-extension
       - agentic-workflows
-    max: 4
+    max: 2
   add-comment:
     max: 1
   set-issue-type:

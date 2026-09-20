@@ -47,6 +47,7 @@ safe-outputs:
     labels: [automation, agentic-workflows]
     draft: true
     max: 1
+    max-patch-files: 1
     allowed-files:
       - AGENTS.md
       - .github/copilot-instructions.md
@@ -58,6 +59,7 @@ safe-outputs:
         - .github/copilot-instructions.md
         - .github/instructions/
   noop:
+    report-as-issue: false
 
 steps:
   - name: Setup Node.js

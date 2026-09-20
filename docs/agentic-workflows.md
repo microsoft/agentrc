@@ -19,13 +19,13 @@ a human reviews the draft pull request
 
 ## Current workflow suite
 
-| Workflow                                                                       | Trigger                        | Maximum output                                           | Purpose                                                                     |
-| ------------------------------------------------------------------------------ | ------------------------------ | -------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [AgentRC Readiness Report](../.github/workflows/agentrc-readiness-report.md)   | Weekly Friday or manual        | One expiring issue                                       | Publish the highest-impact readiness gaps from deterministic AgentRC output |
-| [AgentRC Readiness Upgrade](../.github/workflows/agentrc-readiness-upgrade.md) | Manual                         | One draft PR limited to instruction files                | Demonstrate measure → improve → verify → review                             |
-| [Issue Triage](../.github/workflows/issue-triage.md)                           | Issue opened or reopened       | Four allowlisted labels, one issue type, and one comment | Route incoming issues without inventing missing details                     |
-| [CI Failure Doctor](../.github/workflows/ci-doctor.md)                         | Failed `CI` workflow on `main` | One issue or one comment                                 | Find the first meaningful error and recommend a bounded repair              |
-| [Weekly Repository Status](../.github/workflows/weekly-repo-status.md)         | Weekly Monday or manual        | One expiring issue                                       | Summarize delivery, quality, and automation health                          |
+| Workflow                                                                       | Trigger                        | Maximum output                                          | Purpose                                                                     |
+| ------------------------------------------------------------------------------ | ------------------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [AgentRC Readiness Report](../.github/workflows/agentrc-readiness-report.md)   | Weekly Friday or manual        | One expiring issue                                      | Publish the highest-impact readiness gaps from deterministic AgentRC output |
+| [AgentRC Readiness Upgrade](../.github/workflows/agentrc-readiness-upgrade.md) | Manual                         | One draft PR limited to instruction files               | Demonstrate measure → improve → verify → review                             |
+| [Issue Triage](../.github/workflows/issue-triage.md)                           | Issue opened or reopened       | Two allowlisted labels, one issue type, and one comment | Route incoming issues without inventing missing details                     |
+| [CI Failure Doctor](../.github/workflows/ci-doctor.md)                         | Failed `CI` workflow on `main` | One issue or one comment                                | Find the first meaningful error and recommend a bounded repair              |
+| [Weekly Repository Status](../.github/workflows/weekly-repo-status.md)         | Weekly Monday or manual        | One expiring issue                                      | Summarize delivery, quality, and automation health                          |
 
 The imported workflows retain their `source:` reference to
 [`githubnext/agentics`](https://github.com/githubnext/agentics). AgentRC-specific

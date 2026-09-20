@@ -46,6 +46,7 @@ safe-outputs:
     expires: 14d
     max: 1
   noop:
+    report-as-issue: false
 
 steps:
   - name: Setup Node.js
