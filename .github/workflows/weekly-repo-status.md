@@ -66,7 +66,7 @@ steps:
           --json databaseId,workflowName,status,conclusion,event,createdAt,updatedAt,url
         printf '\n```\n\n## Releases\n\n```json\n'
         gh release list --repo "$GITHUB_REPOSITORY" --limit 10 \
-          --json tagName,name,isDraft,isPrerelease,publishedAt,url
+          --json tagName,name,isDraft,isPrerelease,publishedAt
         printf '\n```\n'
       } > /tmp/gh-aw/agent/weekly-status-evidence.md
 ---
