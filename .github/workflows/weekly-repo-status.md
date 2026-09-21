@@ -21,17 +21,18 @@ concurrency:
   group: weekly-repo-status
   cancel-in-progress: true
 
-max-ai-credits: 100
-max-daily-ai-credits: 150
-max-turns: 10
+max-ai-credits: 150
+max-daily-ai-credits: 250
+max-turns: 12
 
 network: defaults
 
 tools:
-  bash: ["cat", "ls", "find", "grep", "head", "tail", "wc"]
-  github:
-    toolsets: [default, actions]
-    min-integrity: approved
+  bash:
+    - "cat /tmp/gh-aw/agent/weekly-status-evidence.md"
+    - "jq"
+    - "safeoutputs create_issue"
+    - "safeoutputs noop"
 
 safe-outputs:
   mentions: false
@@ -41,7 +42,33 @@ safe-outputs:
     close-older-issues: true
     expires: 14d
     max: 1
+  noop:
+    report-as-issue: false
 source: githubnext/agentics/workflows/repo-status.md@4bc8419fad05e6b032741cbfd189986700bcf71c
+
+steps:
+  - name: Collect weekly repository evidence
+    env:
+      GH_TOKEN: ${{ github.token }}
+    run: |
+      mkdir -p /tmp/gh-aw/agent
+      {
+        printf '# Weekly repository evidence\n\n'
+        printf 'Generated: %s\n\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf '## Pull requests\n\n```json\n'
+        gh pr list --repo "$GITHUB_REPOSITORY" --state all --limit 50 \
+          --json number,title,state,isDraft,createdAt,updatedAt,closedAt,mergedAt,author,url
+        printf '\n```\n\n## Issues\n\n```json\n'
+        gh issue list --repo "$GITHUB_REPOSITORY" --state all --limit 50 \
+          --json number,title,state,createdAt,updatedAt,closedAt,author,labels,url
+        printf '\n```\n\n## Workflow runs\n\n```json\n'
+        gh run list --repo "$GITHUB_REPOSITORY" --limit 50 \
+          --json databaseId,workflowName,status,conclusion,event,createdAt,updatedAt,url
+        printf '\n```\n\n## Releases\n\n```json\n'
+        gh release list --repo "$GITHUB_REPOSITORY" --limit 10 \
+          --json tagName,name,isDraft,isPrerelease,publishedAt,url
+        printf '\n```\n'
+      } > /tmp/gh-aw/agent/weekly-status-evidence.md
 ---
 
 # Weekly AgentRC Status
@@ -64,9 +91,16 @@ Create one concise weekly status report for AgentRC as a GitHub issue.
 - Separate verified facts from recommendations.
 - Keep the issue under 700 words.
 
-## Process
+## Execution contract
 
-1. Gather activity from the previous seven days.
-2. Compare the current week with the preceding seven days.
-3. Inspect repeated workflow failures before recommending new automation.
-4. Create one issue. If there is no meaningful change, use `noop`.
+Complete this workflow with exactly two tool calls:
+
+1. Run `cat /tmp/gh-aw/agent/weekly-status-evidence.md`.
+2. Immediately submit the report with either `safeoutputs create_issue` or
+   `safeoutputs noop`.
+
+Use only the precomputed evidence. Do not run GitHub, Git, Python, or additional
+shell queries. Filter timestamps mentally to compare the previous seven days
+with the seven days before that. Create one issue when there is meaningful
+activity or an actionable operational problem. Use `safeoutputs noop` only when
+there is nothing useful to report.
