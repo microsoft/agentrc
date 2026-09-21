@@ -58,7 +58,6 @@ This repository dogfoods [GitHub Agentic Workflows](https://github.github.com/gh
 | [AgentRC Readiness Upgrade](.github/workflows/agentrc-readiness-upgrade.md) | Improves one evidence-backed instruction and verifies the result          | One draft PR                   |
 | [Issue Triage](.github/workflows/issue-triage.md)                           | Classifies new issues and asks for missing information                    | Bounded labels and one comment |
 | [CI Failure Doctor](.github/workflows/ci-doctor.md)                         | Diagnoses failed CI from logs and repository changes                      | One issue or one comment       |
-| [Weekly Repository Status](.github/workflows/weekly-repo-status.md)         | Summarizes delivery, quality, and automation health                       | One expiring weekly issue      |
 
 The source workflows are Markdown. `gh aw compile` generates the reviewable `.lock.yml` workflows that GitHub Actions executes. CI fails when those generated files drift.
 

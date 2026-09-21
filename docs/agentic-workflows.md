@@ -25,7 +25,6 @@ a human reviews the draft pull request
 | [AgentRC Readiness Upgrade](../.github/workflows/agentrc-readiness-upgrade.md) | Manual                         | One draft PR limited to instruction files               | Demonstrate measure → improve → verify → review                             |
 | [Issue Triage](../.github/workflows/issue-triage.md)                           | Issue opened or reopened       | Two allowlisted labels, one issue type, and one comment | Route incoming issues without inventing missing details                     |
 | [CI Failure Doctor](../.github/workflows/ci-doctor.md)                         | Failed `CI` workflow on `main` | One issue or one comment                                | Find the first meaningful error and recommend a bounded repair              |
-| [Weekly Repository Status](../.github/workflows/weekly-repo-status.md)         | Weekly Monday or manual        | One expiring issue                                      | Summarize delivery, quality, and automation health                          |
 
 The imported workflows retain their `source:` reference to
 [`githubnext/agentics`](https://github.com/githubnext/agentics). AgentRC-specific
@@ -38,8 +37,6 @@ The selected catalog workflows cover three recurring maintainer jobs:
 
 - **Issue Triage** reduces response latency without editing code.
 - **CI Failure Doctor** turns a failed run into an evidence-backed diagnosis.
-- **Weekly Repository Status** provides a small operating review instead of
-  another dashboard.
 
 Two custom workflows make the demo specific to AgentRC:
 
@@ -47,9 +44,11 @@ Two custom workflows make the demo specific to AgentRC:
 - **Readiness Upgrade** limits edits to agent instruction files and requires
   before/after evidence.
 
-The previous daily documentation and code-simplification workflows were removed.
-They were generic, created no successful pull requests in the observed run
-history, and consumed attention through repeated failure issues.
+The previous daily documentation, code-simplification, and weekly status
+workflows were removed. They were generic, failed repeatedly in observed runs,
+or produced recommendations about already retired automation. The smaller suite
+keeps the ongoing work tied to concrete repository events and AgentRC's own
+readiness loop.
 
 ## Safety model
 
