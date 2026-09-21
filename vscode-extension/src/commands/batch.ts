@@ -1,4 +1,8 @@
+import path from "node:path";
+
 import * as vscode from "vscode";
+
+import { VscodeProgressReporter } from "../progress.js";
 import {
   generateCopilotInstructions,
   generateNestedInstructions,
@@ -6,8 +10,6 @@ import {
   safeWriteFile,
   writeNestedInstructions
 } from "../services.js";
-import { VscodeProgressReporter } from "../progress.js";
-import path from "node:path";
 
 export async function batchInstructionsCommand(): Promise<void> {
   const folders = vscode.workspace.workspaceFolders;
@@ -50,7 +52,7 @@ export async function batchInstructionsCommand(): Promise<void> {
             const nestedResult = await generateNestedInstructions({
               repoPath: workspacePath,
               model,
-              onProgress: (msg) => reporter.update(msg),
+              onProgress: (msg) => reporter.update(`[${name}] ${msg}`),
               detailDir,
               claudeMd
             });
@@ -66,7 +68,7 @@ export async function batchInstructionsCommand(): Promise<void> {
             }
 
             for (const warning of nestedResult.warnings) {
-              reporter.update(`Warning: ${warning}`);
+              reporter.update(`[${name}] Warning: ${warning}`);
             }
           } else {
             const outputPath = path.join(workspacePath, ".github", "copilot-instructions.md");
