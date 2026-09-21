@@ -25,7 +25,7 @@ function asRealClient(client: MockClient): RealClient {
 }
 
 describe("attachDefaultPermissionHandler", () => {
-  it("injects onPermissionRequest when not provided", async () => {
+  it("injects a read-only onPermissionRequest when not provided", async () => {
     const client = buildMockClient();
     attachDefaultPermissionHandler(asRealClient(client));
 
@@ -36,13 +36,13 @@ describe("attachDefaultPermissionHandler", () => {
     expect(passedConfig.config).toHaveProperty("onPermissionRequest");
     expect(typeof passedConfig.config.onPermissionRequest).toBe("function");
 
-    // The injected handler should approve all request kinds
     const handler = passedConfig.config.onPermissionRequest as (req: unknown) => { kind: string };
-    expect(handler({ kind: "shell" })).toEqual({ kind: "approved" });
-    expect(handler({ kind: "write" })).toEqual({ kind: "approved" });
     expect(handler({ kind: "read" })).toEqual({ kind: "approved" });
-    expect(handler({ kind: "url" })).toEqual({ kind: "approved" });
-    expect(handler({ kind: "mcp" })).toEqual({ kind: "approved" });
+    for (const kind of ["shell", "write", "url", "mcp", "custom-tool"]) {
+      expect(handler({ kind })).toEqual({
+        kind: "denied-no-approval-rule-and-could-not-request-from-user"
+      });
+    }
   });
 
   it("preserves a caller-supplied onPermissionRequest", async () => {

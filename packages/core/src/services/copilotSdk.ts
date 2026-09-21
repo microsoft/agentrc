@@ -78,6 +78,8 @@ async function startExternalServer(cliConfig: CopilotCliConfig): Promise<{
       // Stop accumulating output after settling to avoid unbounded memory growth
       cliProcess.stdout?.removeAllListeners("data");
       cliProcess.stderr?.removeAllListeners("data");
+      cliProcess.stdout?.resume();
+      cliProcess.stderr?.resume();
       resolve({
         cliProcess,
         cliUrl: `localhost:${port}`
@@ -99,7 +101,7 @@ async function startExternalServer(cliConfig: CopilotCliConfig): Promise<{
       const lines = chunk.split("\n");
       for (const line of lines) {
         if (line.trim()) {
-          process.stderr.write(`[CLI subprocess] ${line}\n`);
+          logCopilotDebug(`CLI subprocess: ${line}`);
         }
       }
     });
@@ -128,7 +130,7 @@ async function startExternalServer(cliConfig: CopilotCliConfig): Promise<{
 
 /**
  * Subset of SessionConfig where onPermissionRequest is optional.
- * attachDefaultPermissionHandler injects a default approve-all handler so
+ * attachDefaultPermissionHandler injects a default read-only handler so
  * call-sites do not need to supply one.
  */
 type SessionConfigInput = Omit<CopilotSdk.SessionConfig, "onPermissionRequest"> & {
@@ -148,15 +150,17 @@ export type PatchedCopilotClient = Omit<
 };
 
 /**
- * Wrap createSession so every session automatically approves all permission
- * requests.  Copilot SDK >= 0.1.28 requires an explicit onPermissionRequest
- * handler; without one, session creation fails.  Injecting it here keeps the
- * concern centralised and prevents call-sites from forgetting the handler.
+ * Wrap createSession so sessions without an explicit permission policy can
+ * only read repository content. Copilot SDK >= 0.1.28 requires an explicit
+ * onPermissionRequest handler; without one, session creation fails.
  */
 export function attachDefaultPermissionHandler(
   client: InstanceType<CopilotSdkModule["CopilotClient"]>
 ): void {
-  const approveAll: CopilotSdk.PermissionHandler = () => ({ kind: "approved" as const });
+  const readOnly: CopilotSdk.PermissionHandler = (request) =>
+    request.kind === "read"
+      ? { kind: "approved" as const }
+      : { kind: "denied-no-approval-rule-and-could-not-request-from-user" as const };
   const originalCreateSession = client.createSession.bind(client);
   // Override createSession so onPermissionRequest is optional at call sites.
   // The cast targets our PatchedCopilotClient createSession signature which
@@ -165,7 +169,7 @@ export function attachDefaultPermissionHandler(
   (client as unknown as PatchedCopilotClient).createSession = (config: SessionConfigInput) =>
     originalCreateSession({
       ...(config as CopilotSdk.SessionConfig),
-      onPermissionRequest: config.onPermissionRequest ?? approveAll
+      onPermissionRequest: config.onPermissionRequest ?? readOnly
     });
 }
 
@@ -192,9 +196,11 @@ function attachExternalServerCleanup(
 ): void {
   const originalStop = client.stop.bind(client);
   client.stop = (async () => {
-    const errors = await originalStop();
-    killProcessTree(cliProcess);
-    return errors;
+    try {
+      return await originalStop();
+    } finally {
+      killProcessTree(cliProcess);
+    }
   }) as typeof client.stop;
 }
 
@@ -266,9 +272,7 @@ export async function createCopilotClient(
     try {
       await fallbackClient.start();
     } catch (fallbackError) {
-      if (!external.cliProcess.killed) {
-        external.cliProcess.kill();
-      }
+      killProcessTree(external.cliProcess);
       throw normalizeError(fallbackError);
     }
 

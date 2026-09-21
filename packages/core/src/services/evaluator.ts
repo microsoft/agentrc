@@ -82,8 +82,7 @@ export async function runEval(
 ): Promise<{ summary: string; results: EvalResult[]; viewerPath?: string }> {
   const config = await loadConfig(options.configPath);
   const instructionFile = config.instructionFile ?? ".github/copilot-instructions.md";
-  const instructionPath = path.resolve(options.repoPath, instructionFile);
-  const instructionText = await readOptionalFile(instructionPath);
+  const instructionText = await readRepoFile(options.repoPath, instructionFile);
   const baseSystemMessage = config.systemMessage ?? DEFAULT_SYSTEM_MESSAGE;
   const progress = options.onProgress ?? (() => {});
   const defaultOutputPath = path.resolve(
@@ -109,18 +108,10 @@ export async function runEval(
       const prompt = buildPrompt(options.repoPath, testCase.prompt);
       const caseStartedAt = Date.now();
 
-      // Resolve working directory: per-case override (from workspace config) or repo root
-      let caseWorkingDir: string | undefined;
-      if (testCase.workingDirectory) {
-        const resolved = path.resolve(options.repoPath, testCase.workingDirectory);
-        const root = path.resolve(options.repoPath);
-        if (resolved !== root && !resolved.startsWith(root + path.sep)) {
-          throw new Error(
-            `Invalid workingDirectory "${testCase.workingDirectory}": escapes repo boundary`
-          );
-        }
-        caseWorkingDir = resolved;
-      }
+      const caseWorkingDir = await resolveRepoDirectory(
+        options.repoPath,
+        testCase.workingDirectory
+      );
 
       progress(`Running eval ${index + 1}/${total}: ${id} (without instructions)...`);
       const withoutResult = await askOnce(client, {
@@ -195,9 +186,9 @@ export async function runEval(
     let viewerPath: string | undefined;
     if (outputPath) {
       await fs.mkdir(path.dirname(outputPath), { recursive: true });
-      await safeWriteFile(outputPath, JSON.stringify(output, null, 2), true);
+      await writeEvalArtifact(outputPath, JSON.stringify(output, null, 2));
       viewerPath = buildViewerPath(outputPath);
-      await safeWriteFile(viewerPath, buildTrajectoryViewerHtml(output), true);
+      await writeEvalArtifact(viewerPath, buildTrajectoryViewerHtml(output));
     }
 
     const summary = formatSummary(results, runFinishedAt - runStartedAt);
@@ -280,7 +271,8 @@ async function judge(
     systemMessage: {
       content:
         "You are a strict evaluator. Return JSON with keys: verdict (pass|fail|unknown), score (0-100), rationale. Do not include any other text."
-    }
+    },
+    availableTools: []
   });
 
   let content = "";
@@ -332,10 +324,16 @@ function parseJudge(content: string): JudgeResult {
     const match = content.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("No JSON detected");
     const parsed = JSON.parse(match[0]) as JudgeResult;
-    if (!parsed.verdict) throw new Error("Missing verdict");
+    if (!["pass", "fail", "unknown"].includes(parsed.verdict)) {
+      throw new Error("Invalid verdict");
+    }
+    const score = Number(parsed.score);
+    if (!Number.isFinite(score) || score < 0 || score > 100) {
+      throw new Error("Invalid score");
+    }
     return {
       verdict: parsed.verdict,
-      score: Number(parsed.score ?? 0),
+      score,
       rationale: String(parsed.rationale ?? "")
     };
   } catch {
@@ -356,12 +354,51 @@ async function loadConfig(configPath: string): Promise<EvalConfig> {
   return parsed;
 }
 
-async function readOptionalFile(filePath: string): Promise<string> {
-  try {
-    return await fs.readFile(filePath, "utf8");
-  } catch {
-    return "";
+async function readRepoFile(repoPath: string, relativePath: string): Promise<string> {
+  const repoRoot = path.resolve(repoPath);
+  const filePath = path.resolve(repoRoot, relativePath);
+  if (!isWithinRoot(repoRoot, filePath)) {
+    throw new Error(`Invalid instructionFile "${relativePath}": escapes repo boundary`);
   }
+
+  let realFilePath: string;
+  try {
+    realFilePath = await fs.realpath(filePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(`Instruction file not found: ${relativePath}`);
+    }
+    throw error;
+  }
+
+  const realRepoRoot = await fs.realpath(repoRoot);
+  if (!isWithinRoot(realRepoRoot, realFilePath)) {
+    throw new Error(`Invalid instructionFile "${relativePath}": resolves outside repo boundary`);
+  }
+
+  return fs.readFile(realFilePath, "utf8");
+}
+
+async function resolveRepoDirectory(repoPath: string, relativePath?: string): Promise<string> {
+  const repoRoot = path.resolve(repoPath);
+  const directoryPath = path.resolve(repoRoot, relativePath ?? ".");
+  if (!isWithinRoot(repoRoot, directoryPath)) {
+    throw new Error(`Invalid workingDirectory "${relativePath}": escapes repo boundary`);
+  }
+
+  const [realRepoRoot, realDirectoryPath] = await Promise.all([
+    fs.realpath(repoRoot),
+    fs.realpath(directoryPath)
+  ]);
+  if (!isWithinRoot(realRepoRoot, realDirectoryPath)) {
+    throw new Error(`Invalid workingDirectory "${relativePath}": resolves outside repo boundary`);
+  }
+
+  return realDirectoryPath;
+}
+
+function isWithinRoot(root: string, candidate: string): boolean {
+  return candidate === root || candidate.startsWith(root + path.sep);
 }
 
 function buildPrompt(repoPath: string, userPrompt: string): string {
@@ -625,9 +662,24 @@ function resolveOutputPath(
   override?: string,
   configValue?: string
 ): string | undefined {
-  const chosen = override ?? configValue;
-  if (!chosen) return undefined;
-  return path.isAbsolute(chosen) ? chosen : path.resolve(repoPath, chosen);
+  if (override) {
+    return path.isAbsolute(override) ? override : path.resolve(repoPath, override);
+  }
+  if (!configValue) return undefined;
+
+  const repoRoot = path.resolve(repoPath);
+  const outputPath = path.resolve(repoRoot, configValue);
+  if (!isWithinRoot(repoRoot, outputPath)) {
+    throw new Error(`Invalid outputPath "${configValue}": escapes repo boundary`);
+  }
+  return outputPath;
+}
+
+async function writeEvalArtifact(filePath: string, content: string): Promise<void> {
+  const result = await safeWriteFile(filePath, content, true);
+  if (!result.wrote) {
+    throw new Error(`Failed to write ${filePath}: ${result.reason ?? "unknown reason"}`);
+  }
 }
 
 function buildViewerPath(outputPath: string): string {
