@@ -210,7 +210,9 @@ export function normalizeAgentsHeading(content: string, componentName?: string):
   if (!heading) return content;
 
   const replacedFirstLine = firstLine.replace(headingRe, `# ${heading}`);
-  return firstLineEnd === -1 ? replacedFirstLine : `${replacedFirstLine}\n${content.slice(firstLineEnd + 1)}`;
+  return firstLineEnd === -1
+    ? replacedFirstLine
+    : `${replacedFirstLine}\n${content.slice(firstLineEnd + 1)}`;
 }
 
 /**

@@ -1,3 +1,4 @@
+import fs from "fs/promises";
 import path from "path";
 
 import { analyzeRepo, loadAgentrcConfig } from "@agentrc/core/services/analyzer";
@@ -92,8 +93,8 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
             detailDir,
             claudeMd
           });
-          rootContent = nestedResult.hub.content;
           if (options.dryRun) {
+            rootContent = nestedResult.hub.content;
             const dryFiles = [
               { path: nestedResult.hub.relativePath, content: nestedResult.hub.content },
               ...nestedResult.details.map((d) => ({ path: d.relativePath, content: d.content })),
@@ -127,6 +128,12 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
             }
           } else {
             const actions = await writeNestedInstructions(repoPath, nestedResult, options.force);
+            const hubAction = actions[0];
+            if (hubAction?.action === "wrote") {
+              rootContent = nestedResult.hub.content;
+            } else if (hubAction?.action === "skipped") {
+              rootContent = await fs.readFile(hubAction.path, "utf8").catch(() => undefined);
+            }
             for (const action of actions) {
               const relPath = path.relative(process.cwd(), action.path);
               if (action.action === "wrote") {
