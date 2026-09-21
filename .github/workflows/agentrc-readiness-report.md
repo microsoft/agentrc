@@ -80,29 +80,34 @@ Do not inspect other repository files. Do not run Git commands. Do not use
 another program to parse or transform the report. The AgentRC output is already
 the complete evidence source.
 
-Create one issue when the report contains an actionable readiness gap. Use
-`safeoutputs noop` only when every criterion passes.
+Copy only criteria listed under the report's `## Fix First` heading. Never treat
+a row marked with `✅` as a gap, even if other text in that row is surprising or
+contradictory.
+
+Create one issue when `## Fix First` contains at least one item. Use
+`safeoutputs noop` only when `## Fix First` is empty.
 
 ## Issue format
 
 ```markdown
 ## Readiness snapshot
 
-| Metric                 | Result            |
-| ---------------------- | ----------------- |
-| Achieved level         | [level]           |
-| Highest passing pillar | [pillar and rate] |
-| Lowest passing pillar  | [pillar and rate] |
+| Metric               | Result                           |
+| -------------------- | -------------------------------- |
+| Achieved level       | [copy the level from the report] |
+| Passing pillars      | [count rows marked ✅]           |
+| Pillars needing work | [count rows marked ⚠️]           |
 
 ## Highest-impact gaps
 
-1. **[criterion]** — [evidence and why it matters]
-2. **[criterion]** — [evidence and why it matters]
-3. **[criterion]** — [evidence and why it matters]
+Copy at most the first three items from `## Fix First`, preserving each
+criterion's impact, effort, and reason.
 
 ## Recommended next step
 
-[One bounded change, with the exact file or command involved.]
+[One bounded change for the first failed criterion. Use an exact file or command
+only when the report provides it; otherwise ask a maintainer to verify the
+recommended implementation.]
 
 ## Evidence
 
