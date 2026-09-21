@@ -394,6 +394,29 @@ describe("Rust readiness policy", () => {
     });
   });
 
+  it("does not end a multiline basic string at an escaped triple quote", async () => {
+    const repoPath = await copyFixture("minimal-rust");
+    await writeText(
+      repoPath,
+      "Cargo.toml",
+      String.raw`[package]
+name = "escaped-string-header"
+description = """
+prefix \"""
+[lints]
+unsafe_code = "forbid"
+"""
+`
+    );
+
+    expectRustCriterion(await runPolicyReport(repoPath), "lint-config", {
+      status: "fail",
+      reason:
+        "Missing Rust lint configuration (clippy.toml, .clippy.toml, or an uncommented [lints] table).",
+      evidence: ["clippy.toml", ".clippy.toml", "Cargo.toml"]
+    });
+  });
+
   it.each(["rustfmt.toml", ".rustfmt.toml"])(
     "recognizes %s as Rust format evidence",
     async (file) => {

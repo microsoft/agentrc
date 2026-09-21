@@ -263,7 +263,13 @@ function stripTomlStringsAndComments(content) {
     const character = content[index];
 
     if (stringKind === '"""' || stringKind === "'''") {
-      if (content.startsWith(stringKind, index)) {
+      if (stringKind === '"""' && character === "\\") {
+        result += " ";
+        if (index + 1 < content.length) {
+          index++;
+          result += content[index] === "\n" ? "\n" : " ";
+        }
+      } else if (content.startsWith(stringKind, index)) {
         result += "   ";
         index += 2;
         stringKind = undefined;
