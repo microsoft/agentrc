@@ -353,7 +353,9 @@ describe("Rust readiness policy", () => {
     ["clippy.toml", "clippy.toml"],
     [".clippy.toml", ".clippy.toml"],
     ["Cargo.toml", '[package]\nname = "lint-header"\n\n[lints]\nunsafe_code = "forbid"\n'],
-    ["Cargo.toml", '[workspace]\nmembers = []\n\n[workspace.lints]\nunsafe_code = "forbid"\n']
+    ["Cargo.toml", '[workspace]\nmembers = []\n\n[workspace.lints]\nunsafe_code = "forbid"\n'],
+    ["Cargo.toml", '[package]\nname = "lint-header"\n\n[lints.rust]\nunsafe_code = "forbid"\n'],
+    ["Cargo.toml", '[workspace]\nmembers = []\n\n[workspace.lints.clippy]\nunwrap_used = "deny"\n']
   ])("recognizes lint evidence from %s", async (file, content) => {
     const repoPath = await copyFixture("minimal-rust");
     await writeText(repoPath, file, content);
@@ -367,6 +369,22 @@ describe("Rust readiness policy", () => {
   it("does not treat a commented Cargo lint header as evidence", async () => {
     const repoPath = await copyFixture("minimal-rust");
     await writeText(repoPath, "Cargo.toml", '[package]\nname = "commented"\n# [lints]\n');
+
+    expectRustCriterion(await runPolicyReport(repoPath), "lint-config", {
+      status: "fail",
+      reason:
+        "Missing Rust lint configuration (clippy.toml, .clippy.toml, or an uncommented [lints] table).",
+      evidence: ["clippy.toml", ".clippy.toml", "Cargo.toml"]
+    });
+  });
+
+  it("does not treat a Cargo lint header inside a multiline string as evidence", async () => {
+    const repoPath = await copyFixture("minimal-rust");
+    await writeText(
+      repoPath,
+      "Cargo.toml",
+      '[package]\nname = "string-header"\ndescription = """\n[lints]\nunsafe_code = "forbid"\n"""\n'
+    );
 
     expectRustCriterion(await runPolicyReport(repoPath), "lint-config", {
       status: "fail",
@@ -474,6 +492,31 @@ describe("Rust readiness policy", () => {
       });
     }
   });
+
+  it.each([
+    ["Python", "pyproject.toml", '[project]\nname = "mixed"\n', "src/main.py", "print('ok')\n"],
+    ["Go", "go.mod", "module example.com/mixed\n\ngo 1.25\n", "main.go", "package main\n"]
+  ])(
+    "preserves non-Rust behavior for a mixed Rust and %s repository",
+    async (_language, manifest, manifestContent, source, sourceContent) => {
+      const repoPath = await copyFixture("minimal-rust");
+      await writeText(repoPath, manifest, manifestContent);
+      await writeText(repoPath, source, sourceContent);
+
+      const baseline = await runReadinessReport({ repoPath });
+      const policyReport = await runPolicyReport(repoPath);
+
+      for (const id of replacementIds) {
+        expect(getCriterion(policyReport, id)).toEqual(getCriterion(baseline, id));
+      }
+      for (const id of customIds) {
+        expectRustCriterion(policyReport, id, {
+          status: "skip",
+          reason: "Not a pure Rust repository."
+        });
+      }
+    }
+  );
 
   it("keeps non-Rust Node and Python reports structurally identical after normalization", async () => {
     for (const fixture of ["node-only", "python-only"]) {

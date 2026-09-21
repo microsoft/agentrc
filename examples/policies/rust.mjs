@@ -44,6 +44,18 @@ const RUST_LINT_CANDIDATES = ["clippy.toml", ".clippy.toml"];
 const RUST_FORMAT_CANDIDATES = ["rustfmt.toml", ".rustfmt.toml"];
 const RUST_TOOLCHAIN_CANDIDATES = ["rust-toolchain.toml", "rust-toolchain"];
 const RUST_SUPPLY_CHAIN_CANDIDATES = ["deny.toml", ".cargo/audit.toml", "supply-chain/config.toml"];
+const NON_RUST_ROOT_CANDIDATES = [
+  "package.json",
+  "pyproject.toml",
+  "go.mod",
+  "go.work",
+  "pom.xml",
+  "build.gradle",
+  "build.gradle.kts",
+  "global.json",
+  "Gemfile",
+  "composer.json"
+];
 
 function resolveContainedPath(repoPath, candidate) {
   if (typeof repoPath !== "string" || typeof candidate !== "string" || path.isAbsolute(candidate)) {
@@ -221,31 +233,90 @@ function hasRootCandidate(context, candidates) {
   return candidates.some((candidate) => rootFiles.includes(candidate));
 }
 
-function hasNodeScope(context) {
-  return (
-    hasRootCandidate(context, ["package.json"]) ||
-    Boolean(context?.rootPackageJson) ||
-    (Array.isArray(context?.apps) && context.apps.some((app) => app?.ecosystem === "node"))
-  );
-}
-
 async function isRootRustRepository(context) {
   return isSafeFixedFile(context?.repoPath, "Cargo.toml");
 }
 
 async function isPureRustRepository(context) {
-  return (await isRootRustRepository(context)) && !hasNodeScope(context);
+  if (!(await isRootRustRepository(context))) return false;
+
+  const languages = Array.isArray(context?.analysis?.languages)
+    ? context.analysis.languages.map((language) => String(language).toLowerCase())
+    : [];
+  if (languages.some((language) => language !== "rust")) return false;
+
+  if (
+    Array.isArray(context?.apps) &&
+    context.apps.some((app) => app?.ecosystem && app.ecosystem !== "rust")
+  ) {
+    return false;
+  }
+
+  return !context?.rootPackageJson && !hasRootCandidate(context, NON_RUST_ROOT_CANDIDATES);
+}
+
+function stripTomlStringsAndComments(content) {
+  let result = "";
+  let stringKind;
+
+  for (let index = 0; index < content.length; index++) {
+    const character = content[index];
+
+    if (stringKind === '"""' || stringKind === "'''") {
+      if (content.startsWith(stringKind, index)) {
+        result += "   ";
+        index += 2;
+        stringKind = undefined;
+      } else if (character === "\n") {
+        result += "\n";
+      } else {
+        result += " ";
+      }
+      continue;
+    }
+
+    if (stringKind === '"' || stringKind === "'") {
+      if (character === stringKind) {
+        stringKind = undefined;
+      } else if (stringKind === '"' && character === "\\") {
+        result += " ";
+        if (index + 1 < content.length) {
+          index++;
+          result += content[index] === "\n" ? "\n" : " ";
+        }
+        continue;
+      }
+      result += character === "\n" ? "\n" : " ";
+      continue;
+    }
+
+    if (content.startsWith('"""', index) || content.startsWith("'''", index)) {
+      stringKind = content.slice(index, index + 3);
+      result += "   ";
+      index += 2;
+    } else if (character === '"' || character === "'") {
+      stringKind = character;
+      result += " ";
+    } else if (character === "#") {
+      while (index < content.length && content[index] !== "\n") {
+        result += " ";
+        index++;
+      }
+      if (index < content.length) result += "\n";
+    } else {
+      result += character;
+    }
+  }
+
+  return result;
 }
 
 async function hasCargoLintHeader(repoPath) {
   const content = await readSafeCargoManifest(repoPath);
   if (!content) return false;
 
-  const uncommented = content
-    .split(/\r?\n/u)
-    .filter((line) => !line.trimStart().startsWith("#"))
-    .join("\n");
-  return /^\s*\[(?:workspace\.)?lints\]\s*(?:#.*)?$/mu.test(uncommented);
+  const structuralContent = stripTomlStringsAndComments(content);
+  return /^\s*\[(?:workspace\.)?lints(?:\.[^\]]+)?\]\s*$/mu.test(structuralContent);
 }
 
 async function rustLintResult(context) {
