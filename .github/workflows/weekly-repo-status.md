@@ -64,6 +64,9 @@ steps:
         printf '\n```\n\n## Workflow runs\n\n```json\n'
         gh run list --repo "$GITHUB_REPOSITORY" --limit 50 \
           --json databaseId,workflowName,status,conclusion,event,createdAt,updatedAt,url
+        printf '\n```\n\n## Active workflows\n\n```json\n'
+        gh workflow list --repo "$GITHUB_REPOSITORY" --all \
+          --json name,state,path
         printf '\n```\n\n## Releases\n\n```json\n'
         gh release list --repo "$GITHUB_REPOSITORY" --limit 10 \
           --json tagName,name,isDraft,isPrerelease,publishedAt
@@ -104,3 +107,7 @@ shell queries. Filter timestamps mentally to compare the previous seven days
 with the seven days before that. Create one issue when there is meaningful
 activity or an actionable operational problem. Use `safeoutputs noop` only when
 there is nothing useful to report.
+
+Treat the `Active workflows` section as authoritative. Do not recommend fixing
+or restoring failures from workflows that are no longer active. In particular,
+Code Simplifier and Daily Documentation Updater were intentionally retired.

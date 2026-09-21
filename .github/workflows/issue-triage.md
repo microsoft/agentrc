@@ -20,9 +20,19 @@ concurrency:
   group: issue-triage-${{ github.event.issue.number }}
   cancel-in-progress: true
 
-max-ai-credits: 50
-max-daily-ai-credits: 500
-max-turns: 8
+max-ai-credits: 100
+max-daily-ai-credits: 750
+max-turns: 15
+
+tools:
+  github:
+    toolsets: [default]
+  bash:
+    - "jq"
+    - "safeoutputs add_comment"
+    - "safeoutputs add_labels"
+    - "safeoutputs noop"
+    - "safeoutputs set_issue_type"
 
 safe-outputs:
   add-labels:
@@ -41,6 +51,8 @@ safe-outputs:
     max: 1
   set-issue-type:
     max: 1
+  noop:
+    report-as-issue: false
 
 timeout-minutes: 10
 source: githubnext/agentics/workflows/issue-triage.md@4bc8419fad05e6b032741cbfd189986700bcf71c
@@ -51,6 +63,19 @@ source: githubnext/agentics/workflows/issue-triage.md@4bc8419fad05e6b032741cbfd1
 Analyze issue #${{ github.event.issue.number }} and help maintainers understand
 and route it quickly. Base every conclusion on the issue, its discussion, and
 repository context. Do not invent missing details.
+
+Complete the workflow in at most five tool calls:
+
+1. Use the issue context already provided in the prompt. Do not fetch the
+   current issue again.
+2. Search once for up to three likely duplicates only when the issue is
+   complete enough to compare.
+3. Submit only the necessary `add_labels`, `set_issue_type`, and `add_comment`
+   safe outputs. Use `noop` when no action is justified.
+
+Do not list repository labels: the complete allowlist is declared in
+`safe-outputs.add-labels.allowed`. Do not parse GitHub tool output with shell
+commands.
 
 ## 1. Gather context
 
