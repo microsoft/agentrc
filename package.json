@@ -31,7 +31,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@github/copilot-sdk": "^0.2.0",
+    "@github/copilot-sdk": "0.2.0",
     "@inquirer/prompts": "^8.2.1",
     "@octokit/rest": "^22.0.1",
     "chalk": "^5.6.2",
@@ -66,5 +66,8 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "@github/copilot": "1.0.10"
   }
 }

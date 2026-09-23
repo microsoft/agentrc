@@ -312,7 +312,7 @@
   ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@github/copilot-sdk": "^0.2.0",
+    "@github/copilot-sdk": "0.2.0",
     "@octokit/rest": "^22.0.1",
     "@typescript-eslint/eslint-plugin": "^8.57.1",
     "@typescript-eslint/parser": "^8.56.0",
@@ -324,5 +324,8 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.3.0",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@github/copilot": "1.0.10"
   }
 }
