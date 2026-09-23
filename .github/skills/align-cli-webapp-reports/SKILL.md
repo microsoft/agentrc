@@ -1,5 +1,7 @@
 ---
+name: align-cli-webapp-reports
 description: Compare CLI visual readiness report with local webapp report for a given repo, identify differences in checks/rendering/scoring, and fix them
+disable-model-invocation: true
 ---
 
 You are debugging consistency between two readiness report outputs for the **AgentRC** project:

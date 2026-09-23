@@ -5,6 +5,8 @@ import path from "path";
 import { runReadinessReport } from "@agentrc/core/services/readiness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+const AGENT_PLUGINS_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
+
 describe("runReadinessReport", () => {
   let repoPath: string;
 
@@ -220,6 +222,41 @@ describe("runReadinessReport", () => {
       expect(criterion?.status).toBe("pass");
     });
 
+    it("passes custom-instructions when GEMINI.md exists", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("GEMINI.md", "# Gemini instructions");
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "custom-instructions");
+
+      expect(criterion?.status).toBe("pass");
+    });
+
+    it("passes custom-instructions when only file-based instructions exist", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile(
+        ".github/instructions/nested/api.instructions.md",
+        "---\napplyTo: src/api/**\n---\n# API"
+      );
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "custom-instructions");
+
+      expect(criterion?.status).toBe("pass");
+      expect(criterion?.evidence).toContain(".github/instructions/nested/api.instructions.md");
+    });
+
+    it("passes custom-instructions for nested Copilot CLI instructions", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("packages/api/AGENTS.md", "# API instructions");
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "custom-instructions");
+
+      expect(criterion?.status).toBe("pass");
+      expect(criterion?.evidence).toContain("packages/api/AGENTS.md");
+    });
+
     it("passes custom-instructions when .cursorrules exists", async () => {
       await writePackageJson({ name: "test-repo" });
       await writeFile(".cursorrules", "rules here");
@@ -286,6 +323,31 @@ describe("runReadinessReport", () => {
       expect(criterion?.status).toBe("pass");
     });
 
+    it.each([".mcp.json", ".github/mcp.json"])(
+      "passes mcp-config when Copilot CLI workspace config %s exists",
+      async (configPath) => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(configPath, JSON.stringify({ mcpServers: {} }));
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "mcp-config");
+
+        expect(criterion?.status).toBe("pass");
+        expect(criterion?.evidence).toContain(configPath);
+      }
+    );
+
+    it("passes mcp-config for a nested Copilot CLI workspace config", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("packages/api/.mcp.json", JSON.stringify({ mcpServers: {} }));
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "mcp-config");
+
+      expect(criterion?.status).toBe("pass");
+      expect(criterion?.evidence).toContain("packages/api/.mcp.json");
+    });
+
     it("passes mcp-config when .vscode/settings.json has mcp key", async () => {
       await writePackageJson({ name: "test-repo" });
       await writeFile(
@@ -309,6 +371,28 @@ describe("runReadinessReport", () => {
       expect(criterion?.status).toBe("pass");
     });
 
+    it("passes custom-agents when .claude/agents directory exists", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile(".claude/agents/reviewer.agent.md", "# Reviewer");
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "custom-agents");
+
+      expect(criterion?.status).toBe("pass");
+      expect(criterion?.evidence).toContain(".claude/agents");
+    });
+
+    it("passes custom-agents for a nested Copilot CLI agents directory", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("packages/api/.github/agents/reviewer.agent.md", "# Reviewer");
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "custom-agents");
+
+      expect(criterion?.status).toBe("pass");
+      expect(criterion?.evidence).toContain("packages/api/.github/agents");
+    });
+
     it("passes copilot-skills when .copilot/skills directory exists", async () => {
       await writePackageJson({ name: "test-repo" });
       await writeFile(".copilot/skills/.gitkeep", "");
@@ -317,6 +401,169 @@ describe("runReadinessReport", () => {
       const criterion = report.criteria.find((c) => c.id === "copilot-skills");
 
       expect(criterion?.status).toBe("pass");
+    });
+
+    it("passes copilot-skills when .agents/skills directory exists", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile(".agents/skills/review/SKILL.md", "# Review");
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "copilot-skills");
+
+      expect(criterion?.status).toBe("pass");
+      expect(criterion?.evidence).toContain(".agents/skills");
+    });
+
+    it("passes copilot-skills for a nested Copilot CLI skills directory", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("packages/api/.github/skills/review/SKILL.md", "# Review");
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "copilot-skills");
+
+      expect(criterion?.status).toBe("pass");
+      expect(criterion?.evidence).toContain("packages/api/.github/skills");
+    });
+
+    it("passes copilot-skills for a root Agent Plugins package", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile(
+        "plugin.json",
+        JSON.stringify({ $schema: AGENT_PLUGINS_SCHEMA, name: "test-plugin" })
+      );
+      await writeFile(
+        "skills/review/SKILL.md",
+        "---\nname: review\ndescription: Review code.\n---\n"
+      );
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "copilot-skills");
+
+      expect(criterion?.status).toBe("pass");
+      expect(criterion?.reason).toBeUndefined();
+      expect(criterion?.evidence).toContain("skills");
+    });
+
+    it("passes custom-agents for an Agent Plugins package", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile(
+        "plugins/review/plugin.json",
+        JSON.stringify({ $schema: AGENT_PLUGINS_SCHEMA, name: "review" })
+      );
+      await writeFile("plugins/review/com.github.copilot/agents/reviewer.agent.md", "# Reviewer");
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "custom-agents");
+
+      expect(criterion?.status).toBe("pass");
+      expect(criterion?.evidence).toContain("plugins/review/com.github.copilot/agents");
+    });
+
+    it("passes custom-instructions for Agent Plugin rules", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile(
+        "plugins/review/plugin.json",
+        JSON.stringify({ $schema: AGENT_PLUGINS_SCHEMA, name: "review" })
+      );
+      await writeFile("plugins/review/com.github.copilot/rules/review.md", "# Review rules");
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "custom-instructions");
+      const consistency = report.criteria.find((c) => c.id === "instructions-consistency");
+
+      expect(criterion?.status).toBe("pass");
+      expect(criterion?.evidence).toContain("plugins/review/com.github.copilot/rules");
+      expect(consistency?.status).toBe("skip");
+    });
+
+    it.each([".claude/settings.json", ".github/copilot/settings.json"])(
+      "detects extra plugin marketplaces in %s",
+      async (settingsPath) => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(
+          settingsPath,
+          JSON.stringify({
+            extraKnownMarketplaces: {
+              local: { source: { source: "directory", path: "./plugins" } }
+            }
+          })
+        );
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "plugin-marketplaces");
+
+        expect(criterion?.status).toBe("pass");
+        expect(criterion?.evidence).toContain(`${settingsPath} (extraKnownMarketplaces)`);
+      }
+    );
+
+    it.each([".claude/settings.local.json", ".github/copilot/settings.local.json"])(
+      "detects enabled plugins in %s",
+      async (settingsPath) => {
+        await writePackageJson({ name: "test-repo" });
+        await writeFile(settingsPath, JSON.stringify({ enabledPlugins: { "review@local": true } }));
+
+        const report = await runReadinessReport({ repoPath });
+        const criterion = report.criteria.find((c) => c.id === "enabled-plugins");
+
+        expect(criterion?.status).toBe("pass");
+        expect(criterion?.evidence).toContain(`${settingsPath} (enabledPlugins)`);
+      }
+    );
+
+    it("does not count disabled plugin entries as enabled", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile(
+        ".github/copilot/settings.json",
+        JSON.stringify({ enabledPlugins: { "review@local": false } })
+      );
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "enabled-plugins");
+
+      expect(criterion?.status).toBe("skip");
+    });
+
+    it("passes mcp-config for a nested Agent Plugins package", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile(
+        "plugins/deploy/plugin.json",
+        JSON.stringify({ $schema: AGENT_PLUGINS_SCHEMA, name: "deploy-tools" })
+      );
+      await writeFile("plugins/deploy/mcp.json", JSON.stringify({ mcpServers: {} }));
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "mcp-config");
+
+      expect(criterion?.status).toBe("pass");
+      expect(criterion?.reason).toBeUndefined();
+      expect(criterion?.evidence).toContain("plugins/deploy/mcp.json");
+    });
+
+    it("ignores nonconforming plugin manifests for standard skill discovery", async () => {
+      await writePackageJson({ name: "test-repo" });
+      await writeFile("invalid-json/plugin.json", "{");
+      await writeFile("invalid-json/skills/review/SKILL.md", "# Review");
+      await writeFile(
+        "unsupported/plugin.json",
+        JSON.stringify({
+          $schema: "https://agent-plugins.org/schemas/2.0.0/plugin.schema.json",
+          name: "unsupported"
+        })
+      );
+      await writeFile("unsupported/skills/review/SKILL.md", "# Review");
+      await writeFile("legacy/plugin.json", JSON.stringify({ name: "legacy" }));
+      await writeFile("legacy/skills/review/SKILL.md", "# Review");
+      await writeFile(
+        "invalid-name/plugin.json",
+        JSON.stringify({ $schema: AGENT_PLUGINS_SCHEMA, name: "Invalid-Name" })
+      );
+      await writeFile("invalid-name/skills/review/SKILL.md", "# Review");
+
+      const report = await runReadinessReport({ repoPath });
+      const criterion = report.criteria.find((c) => c.id === "copilot-skills");
+
+      expect(criterion?.status).toBe("fail");
     });
 
     describe("vscode location settings", () => {

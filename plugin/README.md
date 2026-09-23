@@ -1,6 +1,8 @@
 # AgentRC Plugin
 
-Agent plugin for AI-assisted repository priming. Provides skills that generate instruction files for GitHub Copilot, Claude, and other AI coding assistants.
+[Agent Plugins 1.0](https://agent-plugins.org/) package for AI-assisted repository priming. It provides portable skills that generate instruction files for GitHub Copilot and other compatible AI coding assistants.
+
+The package uses the standard layout: `plugin.json` at this directory's root and one `SKILL.md` in each immediate child of `skills/`.
 
 ## Skills
 
@@ -23,7 +25,7 @@ https://github.com/microsoft/agentrc
 
 ### From marketplace
 
-This repository is also listed as a plugin marketplace. Point VS Code at the raw marketplace manifest to discover and install the plugin:
+This repository is also listed as a Copilot plugin marketplace. Point VS Code at the raw marketplace manifest to discover and install the plugin:
 
 ```
 https://raw.githubusercontent.com/microsoft/agentrc/main/.github/plugin/marketplace.json

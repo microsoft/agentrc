@@ -1,6 +1,8 @@
 import fs from "fs/promises";
 import path from "path";
 
+import fg from "fast-glob";
+
 import { fileExists, safeReadDir, readJson } from "../../utils/fs";
 
 import type {
@@ -8,6 +10,24 @@ import type {
   ReadinessContext,
   VscodeLocationSettings
 } from "./types";
+
+const AGENT_PLUGINS_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
+const AGENT_PLUGIN_NAME_PATTERN = /^(?!.*(?:--|\.\.))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/u;
+const AGENT_PLUGIN_SCAN_IGNORES = [
+  "**/.git/**",
+  "**/.agentrc-cache/**",
+  "**/.primer-cache/**",
+  "**/coverage/**",
+  "**/dist/**",
+  "**/node_modules/**",
+  "**/out/**"
+];
+const COPILOT_REPO_SETTINGS_FILES = [
+  ".claude/settings.json",
+  ".claude/settings.local.json",
+  ".github/copilot/settings.json",
+  ".github/copilot/settings.local.json"
+];
 
 export function hasAnyFile(files: string[], candidates: string[]): boolean {
   return candidates.some((candidate) => files.includes(candidate));
@@ -214,6 +234,7 @@ export async function hasCustomInstructions(repoPath: string): Promise<string[]>
     "CLAUDE.md",
     ".claude/CLAUDE.md",
     "AGENTS.md",
+    "GEMINI.md",
     ".github/AGENTS.md",
     ".cursorrules",
     ".cursorignore",
@@ -229,33 +250,63 @@ export async function hasCustomInstructions(repoPath: string): Promise<string[]>
   return found;
 }
 
+export async function hasAgentPluginInstructions(repoPath: string): Promise<string[]> {
+  const pluginComponents = await discoverAgentPluginComponents(repoPath);
+  return [...new Set(pluginComponents.instructions)];
+}
+
+export async function hasNestedCopilotInstructions(repoPath: string): Promise<string[]> {
+  const matches = await fg(
+    ["**/.github/copilot-instructions.md", "**/AGENTS.md", "**/CLAUDE.md", "**/GEMINI.md"],
+    {
+      cwd: repoPath,
+      onlyFiles: true,
+      dot: true,
+      followSymbolicLinks: false,
+      ignore: AGENT_PLUGIN_SCAN_IGNORES,
+      unique: true
+    }
+  );
+  return matches.map((entry) => entry.replace(/\\/gu, "/")).sort();
+}
+
+export async function hasCopilotPluginSetting(
+  repoPath: string,
+  key: "enabledPlugins" | "extraKnownMarketplaces"
+): Promise<string[]> {
+  const found: string[] = [];
+  for (const settingsPath of COPILOT_REPO_SETTINGS_FILES) {
+    const settings = await readJson(path.join(repoPath, settingsPath));
+    const value = settings?.[key];
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      continue;
+    }
+    const entries = Object.values(value);
+    const configured =
+      key === "enabledPlugins" ? entries.some((entry) => entry === true) : entries.length > 0;
+    if (configured) {
+      found.push(`${settingsPath} (${key})`);
+    }
+  }
+  return found;
+}
+
 export async function hasFileBasedInstructions(
   repoPath: string,
   extraDirs?: string[]
 ): Promise<string[]> {
   const found: string[] = [];
-  const defaultDir = path.join(repoPath, ".github", "instructions");
-  try {
-    const entries = await fs.readdir(defaultDir);
-    found.push(
-      ...entries
-        .filter((e) => e.endsWith(".instructions.md"))
-        .map((e) => `.github/instructions/${e}`)
-    );
-  } catch {
-    // directory doesn't exist or not readable
-  }
-  for (const dir of extraDirs ?? []) {
-    const fullDir = path.join(repoPath, dir);
+  const instructionDirs = [".github/instructions", ...(extraDirs ?? [])];
+  for (const dir of instructionDirs) {
     const normalizedDir = dir.replace(/\\/gu, "/").replace(/\/+$/u, "");
-    try {
-      const entries = await fs.readdir(fullDir);
-      found.push(
-        ...entries.filter((e) => e.endsWith(".instructions.md")).map((e) => `${normalizedDir}/${e}`)
-      );
-    } catch {
-      // directory doesn't exist or not readable
-    }
+    const entries = await fg("**/*.instructions.md", {
+      cwd: path.join(repoPath, dir),
+      onlyFiles: true,
+      dot: true,
+      followSymbolicLinks: false,
+      suppressErrors: true
+    });
+    found.push(...entries.map((entry) => `${normalizedDir}/${entry.replace(/\\/gu, "/")}`));
   }
   return [...new Set(found)];
 }
@@ -343,13 +394,172 @@ export async function checkInstructionConsistency(
   };
 }
 
+interface AgentPluginComponents {
+  agents: string[];
+  instructions: string[];
+  skills: string[];
+  mcp: string[];
+}
+
+function isAgentPluginsManifest(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const manifest = value as Record<string, unknown>;
+  const name = manifest.name;
+  return (
+    manifest.$schema === AGENT_PLUGINS_SCHEMA &&
+    typeof name === "string" &&
+    name.length <= 64 &&
+    AGENT_PLUGIN_NAME_PATTERN.test(name)
+  );
+}
+
+function isUnavailablePathError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === "ENOENT" || code === "ENOTDIR" || code === "ELOOP";
+}
+
+async function isRegularFile(filePath: string): Promise<boolean> {
+  try {
+    return (await fs.lstat(filePath)).isFile();
+  } catch (error) {
+    if (isUnavailablePathError(error)) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function hasAgentPluginSkills(skillsDir: string): Promise<boolean> {
+  try {
+    if (!(await fs.lstat(skillsDir)).isDirectory()) {
+      return false;
+    }
+    const entries = await fs.readdir(skillsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (
+        entry.isDirectory() &&
+        (await isRegularFile(path.join(skillsDir, entry.name, "SKILL.md")))
+      ) {
+        return true;
+      }
+    }
+    return false;
+  } catch (error) {
+    if (isUnavailablePathError(error)) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function hasMarkdownFiles(directory: string): Promise<boolean> {
+  const files = await fg("**/*.md", {
+    cwd: directory,
+    onlyFiles: true,
+    dot: true,
+    followSymbolicLinks: false,
+    suppressErrors: true
+  });
+  return files.length > 0;
+}
+
+function relativeEvidencePath(repoPath: string, absolutePath: string): string {
+  return path.relative(repoPath, absolutePath).replace(/\\/gu, "/");
+}
+
+function resolveAgentPluginRoot(manifestPath: string): string {
+  const manifestDir = path.dirname(manifestPath);
+  const manifestDirName = path.basename(manifestDir);
+  if (manifestDirName === ".plugin" || manifestDirName === ".claude-plugin") {
+    return path.dirname(manifestDir);
+  }
+  if (manifestDirName === "plugin" && path.basename(path.dirname(manifestDir)) === ".github") {
+    return path.dirname(path.dirname(manifestDir));
+  }
+  return manifestDir;
+}
+
+async function discoverAgentPluginComponents(repoPath: string): Promise<AgentPluginComponents> {
+  const manifestPaths = await fg(["plugin.json", "**/plugin.json"], {
+    cwd: repoPath,
+    absolute: true,
+    onlyFiles: true,
+    dot: true,
+    followSymbolicLinks: false,
+    ignore: AGENT_PLUGIN_SCAN_IGNORES,
+    unique: true
+  });
+  const components: AgentPluginComponents = {
+    agents: [],
+    instructions: [],
+    skills: [],
+    mcp: []
+  };
+
+  for (const manifestPath of manifestPaths.sort()) {
+    let rawManifest: unknown;
+    try {
+      rawManifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+    } catch (error) {
+      if (error instanceof SyntaxError || isUnavailablePathError(error)) {
+        continue;
+      }
+      throw error;
+    }
+    if (!isAgentPluginsManifest(rawManifest)) {
+      continue;
+    }
+
+    const pluginRoot = resolveAgentPluginRoot(manifestPath);
+    const skillsDir = path.join(pluginRoot, "skills");
+    if (await hasAgentPluginSkills(skillsDir)) {
+      components.skills.push(relativeEvidencePath(repoPath, skillsDir));
+    }
+
+    const mcpPath = path.join(pluginRoot, "mcp.json");
+    if (await isRegularFile(mcpPath)) {
+      components.mcp.push(relativeEvidencePath(repoPath, mcpPath));
+    }
+
+    const copilotExtensionDir = path.join(pluginRoot, "com.github.copilot");
+    const agentsDir = path.join(copilotExtensionDir, "agents");
+    if (await hasMarkdownFiles(agentsDir)) {
+      components.agents.push(relativeEvidencePath(repoPath, agentsDir));
+    }
+
+    const rulesDir = path.join(copilotExtensionDir, "rules");
+    if (await hasMarkdownFiles(rulesDir)) {
+      components.instructions.push(relativeEvidencePath(repoPath, rulesDir));
+    }
+  }
+
+  return components;
+}
+
 export async function hasMcpConfig(repoPath: string): Promise<string[]> {
   const found: string[] = [];
   // Check .vscode/mcp.json
   if (await fileExists(path.join(repoPath, ".vscode", "mcp.json"))) {
     found.push(".vscode/mcp.json");
   }
-  // Check root mcp.json
+  // Check Copilot CLI workspace locations at the repository root and in nested projects
+  found.push(
+    ...(
+      await fg([".mcp.json", ".github/mcp.json", "**/.mcp.json", "**/.github/mcp.json"], {
+        cwd: repoPath,
+        onlyFiles: true,
+        dot: true,
+        followSymbolicLinks: false,
+        ignore: AGENT_PLUGIN_SCAN_IGNORES,
+        unique: true
+      })
+    )
+      .map((entry) => entry.replace(/\\/gu, "/"))
+      .sort()
+  );
+  // Check root mcp.json used by other clients
   if (await fileExists(path.join(repoPath, "mcp.json"))) {
     found.push("mcp.json");
   }
@@ -362,12 +572,27 @@ export async function hasMcpConfig(repoPath: string): Promise<string[]> {
   if (await fileExists(path.join(repoPath, ".claude", "mcp.json"))) {
     found.push(".claude/mcp.json");
   }
-  return found;
+  const pluginComponents = await discoverAgentPluginComponents(repoPath);
+  return [...new Set([...found, ...pluginComponents.mcp])];
 }
 
 export async function hasCustomAgents(repoPath: string, extraDirs?: string[]): Promise<string[]> {
   const found: string[] = [];
-  const agentDirs = [".github/agents", ".copilot/agents", ".github/copilot/agents"];
+  found.push(
+    ...(
+      await fg([".github/agents", ".claude/agents", "**/.github/agents", "**/.claude/agents"], {
+        cwd: repoPath,
+        onlyDirectories: true,
+        dot: true,
+        followSymbolicLinks: false,
+        ignore: AGENT_PLUGIN_SCAN_IGNORES,
+        unique: true
+      })
+    )
+      .map((entry) => entry.replace(/\\/gu, "/"))
+      .sort()
+  );
+  const agentDirs = [".copilot/agents", ".github/copilot/agents"];
   for (const dir of agentDirs) {
     if (await fileExists(path.join(repoPath, dir))) {
       found.push(dir);
@@ -385,17 +610,37 @@ export async function hasCustomAgents(repoPath: string, extraDirs?: string[]): P
       found.push(dir);
     }
   }
-  return [...new Set(found)];
+  const pluginComponents = await discoverAgentPluginComponents(repoPath);
+  return [...new Set([...found, ...pluginComponents.agents])];
 }
 
 export async function hasCopilotSkills(repoPath: string, extraDirs?: string[]): Promise<string[]> {
   const found: string[] = [];
-  const skillDirs = [
-    ".copilot/skills",
-    ".github/skills",
-    ".claude/skills",
-    ".github/copilot/skills"
-  ];
+  found.push(
+    ...(
+      await fg(
+        [
+          ".github/skills",
+          ".agents/skills",
+          ".claude/skills",
+          "**/.github/skills",
+          "**/.agents/skills",
+          "**/.claude/skills"
+        ],
+        {
+          cwd: repoPath,
+          onlyDirectories: true,
+          dot: true,
+          followSymbolicLinks: false,
+          ignore: AGENT_PLUGIN_SCAN_IGNORES,
+          unique: true
+        }
+      )
+    )
+      .map((entry) => entry.replace(/\\/gu, "/"))
+      .sort()
+  );
+  const skillDirs = [".copilot/skills", ".github/copilot/skills"];
   for (const dir of skillDirs) {
     if (await fileExists(path.join(repoPath, dir))) {
       found.push(dir);
@@ -406,7 +651,8 @@ export async function hasCopilotSkills(repoPath: string, extraDirs?: string[]): 
       found.push(dir);
     }
   }
-  return [...new Set(found)];
+  const pluginComponents = await discoverAgentPluginComponents(repoPath);
+  return [...new Set([...found, ...pluginComponents.skills])];
 }
 
 // ── APM (Agent Package Manager) helpers ──

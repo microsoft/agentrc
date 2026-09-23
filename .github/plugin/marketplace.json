@@ -12,13 +12,7 @@
       "name": "agentrc",
       "source": "./plugin",
       "description": "Skills for generating instruction files (copilot-instructions.md, area instructions, AGENTS.md) by analyzing repository structure and conventions.",
-      "version": "2.1.0",
-      "skills": [
-        "./skills/root-instructions",
-        "./skills/area-instructions",
-        "./skills/nested-hub",
-        "./skills/nested-detail"
-      ]
+      "version": "2.1.0"
     }
   ]
 }

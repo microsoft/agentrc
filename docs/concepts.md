@@ -51,11 +51,17 @@ These pillars measure general engineering maturity — things that benefit any d
 
 These pillars measure how well the repo is prepared for AI-assisted development:
 
-| Pillar         | What it checks                                             |
-| -------------- | ---------------------------------------------------------- |
-| **AI Tooling** | Custom instructions, MCP servers, agent configs, AI skills |
+| Pillar         | What it checks                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| **AI Tooling** | Custom instructions, MCP servers, agent configs, AI skills, and Agent Plugins 1.0 packages |
 
 At Level 2+, AgentRC also checks **instruction consistency** — if your repo has multiple instruction files (`copilot-instructions.md`, `AGENTS.md`, `CLAUDE.md`), it detects whether they diverge and suggests consolidation.
+
+For [Agent Plugins 1.0](https://agent-plugins.org/), AgentRC recognizes the portable `skills/<name>/SKILL.md` and `mcp.json` components plus Copilot-specific rules and agents under `com.github.copilot/`.
+
+The readiness checks also recognize GitHub Copilot CLI's repository conventions: `.github/copilot-instructions.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/instructions/**/*.instructions.md`, `.github/agents/`, `.claude/agents/`, `.github/skills/`, `.agents/skills/`, `.claude/skills/`, `.mcp.json`, and `.github/mcp.json`.
+
+Repository-scoped `extraKnownMarketplaces` and enabled `enabledPlugins` entries are reported as non-blocking signals when they appear in `.github/copilot/settings*.json` or `.claude/settings*.json`.
 
 ## Instructions
 

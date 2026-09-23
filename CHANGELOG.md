@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
+- **Agent Plugins 1.0 support** — publish AgentRC's built-in skills with the portable `plugin.json` format and recognize standard skill, MCP, rule, agent, marketplace, and enabled-plugin signals during readiness checks
 - **`--dry-run` for generate** — preview which files would be created or skipped without writing anything (`agentrc generate mcp --dry-run`)
 - **JSONC support** — `agentrc.config.json`, `agentrc.eval.json`, and policy files now accept `//` and `/* */` comments
 - **Array eval expectations** — `expectation` field in eval configs accepts `string[]` for structured criteria
