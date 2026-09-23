@@ -61,7 +61,7 @@ This repository dogfoods [GitHub Agentic Workflows](https://github.github.com/gh
 
 The source workflows are Markdown. `gh aw compile` generates the reviewable `.lock.yml` workflows that GitHub Actions executes. CI fails when those generated files drift.
 
-See [Agentic Workflows](docs/agentic-workflows.md) for the architecture, maintenance commands, safety model, and a five-minute live demo.
+See [Agentic Workflows](docs/agentic-workflows.md) for the architecture and maintenance commands. Use the [golden demo runbook](docs/agentic-workflows-demo.md) for the lone-maintainer narrative, exact stage flow, and fallback plan.
 
 ## Works at every scale
 
@@ -112,6 +112,7 @@ The `.instructions.md` format is shared by both tools — no conversion needed w
 | **[VS Code Extension](docs/extension.md)**         | Sidebar views, commands, settings                       |
 | **[Agent Plugin](plugin/README.md)**               | Install as a Copilot agent plugin with built-in skills  |
 | **[Agentic Workflows](docs/agentic-workflows.md)** | Dogfooding, maintenance, and live demo guide            |
+| **[Golden Demo](docs/agentic-workflows-demo.md)**  | Lone-maintainer story and stage-ready runbook           |
 | **[Examples](examples/)**                          | Configs, evals, and policies                            |
 
 [Customize AI in VS Code](https://code.visualstudio.com/docs/copilot/customization/overview) · [Custom instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) · [CONTRIBUTING.md](CONTRIBUTING.md)

@@ -17,6 +17,10 @@ AgentRC measures again
 a human reviews the draft pull request
 ```
 
+For the complete stage narrative, exact browser tabs, talk track, fallback plan,
+and customer Q&A, see
+[Golden demo: a lone maintainer with agentic workflows](agentic-workflows-demo.md).
+
 ## Current workflow suite
 
 | Workflow                                                                       | Trigger                        | Maximum output                                          | Purpose                                                                     |
@@ -92,8 +96,9 @@ Use **AgentRC Readiness Report** for the safest live path.
 1. **Frame the problem:** repository instructions drift as the code changes.
 2. **Show the source:** point to the schedule, read-only permissions, budgets,
    tool list, and one allowed issue output.
-3. **Show deterministic evidence:** AgentRC runs before the model and writes
-   `readiness.json`.
+3. **Show deterministic evidence:** AgentRC runs before the model and writes a
+   full readiness report, then passes only the level and `Fix First` failures to
+   the agent.
 4. **Trigger the workflow:** use **Run workflow** or:
 
    ```bash
@@ -158,7 +163,6 @@ Review upstream changes before updating:
 ```bash
 gh aw update ci-doctor
 gh aw update issue-triage
-gh aw update weekly-repo-status
 npm run workflows:compile
 ```
 
