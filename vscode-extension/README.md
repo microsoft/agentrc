@@ -86,7 +86,7 @@ Both views show welcome screens with action buttons when no data is loaded yet.
 
 ## Requirements
 
-- **VS Code 1.109.0+**
+- **VS Code 1.110.0+**
 - **GitHub Copilot Chat extension** (provides the Copilot CLI)
 - **Copilot authentication** — run `copilot` → `/login` in your terminal
 - **GitHub account** — for GitHub PR creation (authenticated via VS Code)
