@@ -312,18 +312,18 @@
   ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@github/copilot-sdk": "0.2.0",
+    "@github/copilot-sdk": "1.0.16",
     "@octokit/rest": "^22.0.1",
-    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/eslint-plugin": "^8.71.0",
     "@typescript-eslint/parser": "^8.56.0",
-    "@types/node": "^25.5.0",
-    "@types/vscode": "^1.110.0",
-    "@vscode/vsce": "^3.9.2",
-    "esbuild": "^0.28.1",
-    "eslint": "^10.0.3",
+    "@types/node": "^26.6.4",
+    "@types/vscode": "^1.140.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
-    "globals": "^17.3.0",
-    "typescript": "^5.9.3"
+    "globals": "^17.13.0",
+    "typescript": "^7.0.2"
   },
   "overrides": {
     "@github/copilot": "1.0.10"
