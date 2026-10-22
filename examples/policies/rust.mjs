@@ -145,7 +145,11 @@ function hasSameReadMetadata(left, right) {
 
 async function hasUnchangedSafePath(opened) {
   const inspected = await inspectSafeFixedPath(opened.repoPath, opened.candidate);
-  return Boolean(inspected && hasSameIdentity(opened.stats, inspected.stats));
+  return Boolean(
+    inspected &&
+    hasSameIdentity(opened.stats, inspected.stats) &&
+    hasSameReadMetadata(opened.stats, inspected.stats)
+  );
 }
 
 async function openVerifiedFixedFile(repoPath, candidate) {
