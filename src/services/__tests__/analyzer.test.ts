@@ -29,7 +29,7 @@ describe("analyzeRepo", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
     tmpDirs.length = 0;
   });
@@ -994,7 +994,7 @@ describe("loadAgentrcConfig", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
     tmpDirs.length = 0;
   });
@@ -1377,7 +1377,7 @@ describe("writeAreaInstruction", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
     tmpDirs.length = 0;
   });
@@ -1438,7 +1438,7 @@ describe("loadAgentrcConfig workspaces", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
     tmpDirs.length = 0;
   });
@@ -1634,7 +1634,7 @@ describe("detectWorkspaces", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
     tmpDirs.length = 0;
   });
@@ -1731,7 +1731,7 @@ describe("analyzeRepo with workspace config", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
     tmpDirs.length = 0;
   });
