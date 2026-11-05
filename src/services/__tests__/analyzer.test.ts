@@ -9,6 +9,7 @@ import {
   detectWorkspaces,
   type Area
 } from "@agentrc/core/services/analyzer";
+import { analyzeRepo as analyzeRepoModular } from "@agentrc/core/services/analyzer/index";
 import {
   buildAreaFrontmatter,
   buildAreaInstructionContent,
@@ -28,7 +29,7 @@ describe("analyzeRepo", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
     }
     tmpDirs.length = 0;
   });
@@ -472,7 +473,7 @@ describe("analyzeRepo", () => {
     expect(result.areas?.[0].applyTo).toMatch(/\*\*$/u);
   });
 
-  it("config areas override auto-detected (case-insensitive)", async () => {
+  it("retains same-named areas with different patterns", async () => {
     const repoPath = await makeTmpDir();
 
     // Create a heuristic area
@@ -495,8 +496,119 @@ describe("analyzeRepo", () => {
     expect(frontendArea?.description).toBe("UI layer");
     // Should not have duplicate "frontend" (auto) + "Frontend" (config)
     const frontendAreas = (result.areas ?? []).filter((a) => a.name.toLowerCase() === "frontend");
-    expect(frontendAreas.length).toBe(1);
+    expect(frontendAreas).toHaveLength(2);
+    expect(frontendAreas).toContainEqual(
+      expect.objectContaining({ name: "frontend", applyTo: "frontend/**", source: "auto" })
+    );
   });
+
+  it.each([
+    ["legacy", analyzeRepo],
+    ["modular", analyzeRepoModular]
+  ])(
+    "%s analyzer prefers workspace config metadata for identical package patterns",
+    async (_entry, analyze) => {
+      const repoPath = await makeTmpDir();
+      await fs.writeFile(
+        path.join(repoPath, "package.json"),
+        JSON.stringify({ name: "root", workspaces: ["packages/*"] })
+      );
+      for (const name of ["web", "api"]) {
+        await fs.mkdir(path.join(repoPath, "packages", name), { recursive: true });
+        await fs.writeFile(
+          path.join(repoPath, "packages", name, "package.json"),
+          JSON.stringify({ name: `auto-${name}` })
+        );
+      }
+      await fs.writeFile(
+        path.join(repoPath, "agentrc.config.json"),
+        JSON.stringify({
+          workspaces: [
+            {
+              name: "product",
+              path: "packages",
+              areas: [
+                { name: "platform", applyTo: "api/**" },
+                {
+                  name: "frontend",
+                  applyTo: "web/**",
+                  description: "Configured UI",
+                  parentArea: "platform"
+                }
+              ]
+            }
+          ]
+        })
+      );
+
+      const result = await analyze(repoPath);
+
+      expect(result.apps?.map((app) => app.name).sort()).toEqual(["auto-api", "auto-web"]);
+      expect(result.areas).toHaveLength(2);
+      expect(result.areas?.filter((area) => area.applyTo === "packages/web/**")).toEqual([
+        expect.objectContaining({
+          name: "product/frontend",
+          applyTo: "packages/web/**",
+          source: "config",
+          description: "Configured UI",
+          parentArea: "product/platform",
+          workingDirectory: "packages",
+          path: path.join(repoPath, "packages", "web")
+        })
+      ]);
+      expect(result.areas).toContainEqual(
+        expect.objectContaining({
+          name: "product/platform",
+          applyTo: "packages/api/**",
+          source: "config"
+        })
+      );
+    }
+  );
+
+  it.each([
+    ["legacy", analyzeRepo],
+    ["modular", analyzeRepoModular]
+  ])(
+    "%s analyzer deduplicates normalized pattern sets without merging overlaps",
+    async (_entry, analyze) => {
+      const repoPath = await makeTmpDir();
+      await fs.mkdir(path.join(repoPath, "frontend"));
+      await fs.writeFile(path.join(repoPath, "frontend", "index.ts"), "export {};");
+      await fs.writeFile(
+        path.join(repoPath, "agentrc.config.json"),
+        JSON.stringify({
+          areas: [
+            { name: "UI", applyTo: ["frontend\\**"] },
+            { name: "shared", applyTo: ["shared/**", "common/**"] },
+            {
+              name: "libraries",
+              applyTo: ["common\\**", "shared/**", "shared/**"],
+              description: "Configured libraries"
+            },
+            { name: "shared", applyTo: ["shared/**", "extra/**"] },
+            { name: "UI", applyTo: "frontend/components/**" }
+          ]
+        })
+      );
+
+      const result = await analyze(repoPath);
+
+      expect(result.areas).toHaveLength(4);
+      expect(result.areas).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "UI", applyTo: ["frontend\\**"], source: "config" }),
+          expect.objectContaining({
+            name: "libraries",
+            applyTo: ["common\\**", "shared/**", "shared/**"],
+            description: "Configured libraries"
+          }),
+          expect.objectContaining({ name: "shared", applyTo: ["shared/**", "extra/**"] }),
+          expect.objectContaining({ name: "UI", applyTo: "frontend/components/**" })
+        ])
+      );
+    }
+  );
 
   it("returns empty areas for empty directory", async () => {
     const repoPath = await makeTmpDir();
@@ -882,7 +994,7 @@ describe("loadAgentrcConfig", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
     }
     tmpDirs.length = 0;
   });
@@ -1265,7 +1377,7 @@ describe("writeAreaInstruction", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
     }
     tmpDirs.length = 0;
   });
@@ -1326,7 +1438,7 @@ describe("loadAgentrcConfig workspaces", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
     }
     tmpDirs.length = 0;
   });
@@ -1522,7 +1634,7 @@ describe("detectWorkspaces", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
     }
     tmpDirs.length = 0;
   });
@@ -1619,7 +1731,7 @@ describe("analyzeRepo with workspace config", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
     }
     tmpDirs.length = 0;
   });

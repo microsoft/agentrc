@@ -36,18 +36,18 @@ export type RepoAnalysis = {
   packageManager?: string;
   isMonorepo?: boolean;
   workspaceType?:
-    | "npm"
-    | "pnpm"
-    | "yarn"
-    | "cargo"
-    | "go"
-    | "dotnet"
-    | "gradle"
-    | "maven"
-    | "bazel"
-    | "nx"
-    | "pants"
-    | "turborepo";
+  | "npm"
+  | "pnpm"
+  | "yarn"
+  | "cargo"
+  | "go"
+  | "dotnet"
+  | "gradle"
+  | "maven"
+  | "bazel"
+  | "nx"
+  | "pants"
+  | "turborepo";
   workspacePatterns?: string[];
   apps?: RepoApp[];
   areas?: Area[];
@@ -384,8 +384,8 @@ async function resolveWorkspaceApps(
 
   const packageJsonPaths = workspacePatterns.length
     ? (
-        await fg(workspacePatterns, { cwd: repoPath, absolute: true, onlyFiles: true, dot: false })
-      ).map((p) => path.normalize(p))
+      await fg(workspacePatterns, { cwd: repoPath, absolute: true, onlyFiles: true, dot: false })
+    ).map((p) => path.normalize(p))
     : [];
 
   if (!packageJsonPaths.length && rootPackageJson) {
@@ -951,14 +951,14 @@ async function areasFromHeuristics(repoPath: string): Promise<Area[]> {
  * small minimum-size threshold to reduce noise.
  */
 async function areasFromFallback(repoPath: string, existingAreas: Area[]): Promise<Area[]> {
-  const existingNames = new Set(existingAreas.map((a) => a.name.toLowerCase()));
+  const existingIdentities = new Set(existingAreas.map((area) => areaIdentity(area.applyTo)));
   const entries = await safeReadDir(repoPath);
   const areas: Area[] = [];
 
   for (const entry of entries) {
     if (entry.startsWith(".")) continue;
     if (FALLBACK_SKIP_DIRS.has(entry.toLowerCase())) continue;
-    if (existingNames.has(entry.toLowerCase())) continue;
+    if (existingIdentities.has(areaIdentity(`${entry}/**`))) continue;
 
     const fullPath = path.join(repoPath, entry);
     if (!(await isScannableDirectory(repoPath, fullPath))) continue;
@@ -1033,6 +1033,11 @@ async function resolveConfigArea(
   };
 }
 
+function areaIdentity(applyTo: Area["applyTo"]): string {
+  const patterns = Array.isArray(applyTo) ? applyTo : [applyTo];
+  return JSON.stringify(unique(patterns.map((pattern) => pattern.replace(/\\/gu, "/"))).sort());
+}
+
 async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Area[]> {
   let autoAreas: Area[];
 
@@ -1041,11 +1046,11 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
     // Also run heuristics to catch non-app directories (docs, infra, etc.)
     const heuristicAreas = await areasFromHeuristics(repoPath);
     // Merge: app areas take precedence by name
-    const byName = new Map(heuristicAreas.map((a) => [a.name.toLowerCase(), a]));
-    for (const a of appAreas) {
-      byName.set(a.name.toLowerCase(), a);
+    const byIdentity = new Map(heuristicAreas.map((area) => [areaIdentity(area.applyTo), area]));
+    for (const area of appAreas) {
+      byIdentity.set(areaIdentity(area.applyTo), area);
     }
-    autoAreas = Array.from(byName.values());
+    autoAreas = Array.from(byIdentity.values());
   } else {
     autoAreas = await areasFromHeuristics(repoPath);
   }
@@ -1066,13 +1071,14 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
     topLevelDirCount > MIN_TOPLEVEL_DIRS_FOR_FALLBACK
   ) {
     const fallbackAreas = await areasFromFallback(repoPath, autoAreas);
-    const byName = new Map(autoAreas.map((a) => [a.name.toLowerCase(), a]));
-    for (const a of fallbackAreas) {
-      if (!byName.has(a.name.toLowerCase())) {
-        byName.set(a.name.toLowerCase(), a);
+    const byIdentity = new Map(autoAreas.map((area) => [areaIdentity(area.applyTo), area]));
+    for (const area of fallbackAreas) {
+      const identity = areaIdentity(area.applyTo);
+      if (!byIdentity.has(identity)) {
+        byIdentity.set(identity, area);
       }
     }
-    autoAreas = Array.from(byName.values());
+    autoAreas = Array.from(byIdentity.values());
   }
 
   // Merge with config areas (flat + workspace)
@@ -1115,12 +1121,12 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
   }
 
   // Config areas override auto-detected by name (case-insensitive)
-  const autoByName = new Map(autoAreas.map((a) => [a.name.toLowerCase(), a]));
-  for (const ca of configAreas) {
-    autoByName.set(ca.name.toLowerCase(), ca);
+  const byIdentity = new Map(autoAreas.map((area) => [areaIdentity(area.applyTo), area]));
+  for (const area of configAreas) {
+    byIdentity.set(areaIdentity(area.applyTo), area);
   }
 
-  return Array.from(autoByName.values());
+  return Array.from(byIdentity.values());
 }
 
 // ─── Workspace detection ───
