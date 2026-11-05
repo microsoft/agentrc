@@ -10,6 +10,7 @@ export type RepoApp = {
 
 export type Area = {
   name: string;
+  instructionName?: string;
   description?: string;
   applyTo: string | string[];
   path?: string;
@@ -18,6 +19,7 @@ export type Area = {
   scripts?: Record<string, string>;
   hasTsConfig?: boolean;
   parentArea?: string;
+  parentInstructionName?: string;
   workingDirectory?: string;
 };
 
@@ -29,18 +31,18 @@ export type RepoAnalysis = {
   packageManager?: string;
   isMonorepo?: boolean;
   workspaceType?:
-    | "npm"
-    | "pnpm"
-    | "yarn"
-    | "cargo"
-    | "go"
-    | "dotnet"
-    | "gradle"
-    | "maven"
-    | "bazel"
-    | "nx"
-    | "pants"
-    | "turborepo";
+  | "npm"
+  | "pnpm"
+  | "yarn"
+  | "cargo"
+  | "go"
+  | "dotnet"
+  | "gradle"
+  | "maven"
+  | "bazel"
+  | "nx"
+  | "pants"
+  | "turborepo";
   workspacePatterns?: string[];
   apps?: RepoApp[];
   areas?: Area[];

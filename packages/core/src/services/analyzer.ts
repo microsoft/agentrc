@@ -5,6 +5,8 @@ import fg from "fast-glob";
 
 import { fileExists, safeReadDir, readJson } from "../utils/fs";
 
+import { assignAreaInstructionNames } from "./analyzer/areas";
+
 export type RepoApp = {
   name: string;
   path: string;
@@ -17,6 +19,7 @@ export type RepoApp = {
 
 export type Area = {
   name: string;
+  instructionName?: string;
   description?: string;
   applyTo: string | string[];
   path?: string;
@@ -25,6 +28,7 @@ export type Area = {
   scripts?: Record<string, string>;
   hasTsConfig?: boolean;
   parentArea?: string;
+  parentInstructionName?: string;
   workingDirectory?: string;
 };
 
@@ -36,18 +40,18 @@ export type RepoAnalysis = {
   packageManager?: string;
   isMonorepo?: boolean;
   workspaceType?:
-    | "npm"
-    | "pnpm"
-    | "yarn"
-    | "cargo"
-    | "go"
-    | "dotnet"
-    | "gradle"
-    | "maven"
-    | "bazel"
-    | "nx"
-    | "pants"
-    | "turborepo";
+  | "npm"
+  | "pnpm"
+  | "yarn"
+  | "cargo"
+  | "go"
+  | "dotnet"
+  | "gradle"
+  | "maven"
+  | "bazel"
+  | "nx"
+  | "pants"
+  | "turborepo";
   workspacePatterns?: string[];
   apps?: RepoApp[];
   areas?: Area[];
@@ -384,8 +388,8 @@ async function resolveWorkspaceApps(
 
   const packageJsonPaths = workspacePatterns.length
     ? (
-        await fg(workspacePatterns, { cwd: repoPath, absolute: true, onlyFiles: true, dot: false })
-      ).map((p) => path.normalize(p))
+      await fg(workspacePatterns, { cwd: repoPath, absolute: true, onlyFiles: true, dot: false })
+    ).map((p) => path.normalize(p))
     : [];
 
   if (!packageJsonPaths.length && rootPackageJson) {
@@ -1001,7 +1005,7 @@ async function resolveConfigArea(
   ca: AgentrcConfigArea
 ): Promise<Area | undefined> {
   const patterns = Array.isArray(ca.applyTo) ? ca.applyTo : [ca.applyTo];
-  const nonGlobPrefix = longestNonGlobPrefix(patterns[0]);
+  const nonGlobPrefix = longestNonGlobPrefix(patterns[0].replace(/\\/gu, "/"));
   const basePath = nonGlobPrefix ? path.join(repoPath, nonGlobPrefix) : repoPath;
 
   const resolved = path.resolve(basePath);
@@ -1083,7 +1087,9 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
 
   // Merge with config areas (flat + workspace)
   const config = await loadAgentrcConfig(repoPath);
-  if (!config?.areas?.length && !config?.workspaces?.length) return autoAreas;
+  if (!config?.areas?.length && !config?.workspaces?.length) {
+    return assignAreaInstructionNames(autoAreas);
+  }
 
   const resolvedRoot = path.resolve(repoPath);
   const configAreas: Area[] = [];
@@ -1126,7 +1132,21 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
     byIdentity.set(areaIdentity(area.applyTo), area);
   }
 
-  return Array.from(byIdentity.values());
+  const areas = assignAreaInstructionNames(Array.from(byIdentity.values()));
+  const identityByName = new Map(
+    configAreas.map((area) => [area.name.toLowerCase(), areaIdentity(area.applyTo)])
+  );
+  for (const area of areas) {
+    if (!area.parentArea) continue;
+    const parentIdentity = identityByName.get(area.parentArea.toLowerCase());
+    const parent = parentIdentity ? byIdentity.get(parentIdentity) : undefined;
+    if (parent) {
+      area.parentArea = parent.name;
+      if (parent.instructionName) area.parentInstructionName = parent.instructionName;
+    }
+  }
+
+  return areas;
 }
 
 // ─── Workspace detection ───

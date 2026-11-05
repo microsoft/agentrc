@@ -1203,7 +1203,7 @@ export function AgentRCTui({ repoPath, skipAnimation = false }: Props): React.JS
           <Divider columns={terminalColumns} label="Nested instructions" accessible={accessible} />
           <Box flexDirection="column" paddingLeft={1}>
             {repoAreas.map((area, i) => (
-              <Text key={area.name}>
+              <Text key={area.instructionName ?? area.name}>
                 <Text color={i === areaCursor ? "cyanBright" : "gray"}>
                   {i === areaCursor ? (accessible ? ">" : "▶") : " "}
                 </Text>

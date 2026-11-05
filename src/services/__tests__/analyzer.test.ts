@@ -29,7 +29,7 @@ describe("analyzeRepo", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
     }
     tmpDirs.length = 0;
   });
@@ -473,7 +473,10 @@ describe("analyzeRepo", () => {
     expect(result.areas?.[0].applyTo).toMatch(/\*\*$/u);
   });
 
-  it("retains same-named areas with different patterns", async () => {
+  it.each([
+    ["legacy", analyzeRepo],
+    ["modular", analyzeRepoModular]
+  ])("%s analyzer retains same-named areas with different patterns", async (_entry, analyze) => {
     const repoPath = await makeTmpDir();
 
     // Create a heuristic area
@@ -488,7 +491,7 @@ describe("analyzeRepo", () => {
       })
     );
 
-    const result = await analyzeRepo(repoPath);
+    const result = await analyze(repoPath);
     const frontendArea = result.areas?.find((a) => a.name === "Frontend");
     expect(frontendArea).toBeDefined();
     expect(frontendArea?.source).toBe("config");
@@ -500,6 +503,21 @@ describe("analyzeRepo", () => {
     expect(frontendAreas).toContainEqual(
       expect.objectContaining({ name: "frontend", applyTo: "frontend/**", source: "auto" })
     );
+
+    const results = [];
+    for (const area of frontendAreas) {
+      results.push(await writeAreaInstruction(repoPath, area, `# ${area.applyTo}`));
+    }
+    expect(results.map((written) => written.status)).toEqual(["written", "written"]);
+    expect(new Set(results.map((written) => written.filePath)).size).toBe(2);
+
+    for (const area of frontendAreas) {
+      await writeAreaInstruction(repoPath, area, `# Updated ${area.applyTo}`, true);
+    }
+    for (const area of frontendAreas) {
+      const content = await fs.readFile(areaInstructionPath(repoPath, area), "utf8");
+      expect(content).toContain(`# Updated ${area.applyTo}`);
+    }
   });
 
   it.each([
@@ -576,6 +594,11 @@ describe("analyzeRepo", () => {
       await fs.mkdir(path.join(repoPath, "frontend"));
       await fs.writeFile(path.join(repoPath, "frontend", "index.ts"), "export {};");
       await fs.writeFile(
+        path.join(repoPath, "frontend", "package.json"),
+        JSON.stringify({ scripts: { build: "tsc" } })
+      );
+      await fs.writeFile(path.join(repoPath, "frontend", "tsconfig.json"), "{}");
+      await fs.writeFile(
         path.join(repoPath, "agentrc.config.json"),
         JSON.stringify({
           areas: [
@@ -597,7 +620,14 @@ describe("analyzeRepo", () => {
       expect(result.areas).toHaveLength(4);
       expect(result.areas).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ name: "UI", applyTo: ["frontend\\**"], source: "config" }),
+          expect.objectContaining({
+            name: "UI",
+            applyTo: ["frontend\\**"],
+            source: "config",
+            path: path.join(repoPath, "frontend"),
+            scripts: { build: "tsc" },
+            hasTsConfig: true
+          }),
           expect.objectContaining({
             name: "libraries",
             applyTo: ["common\\**", "shared/**", "shared/**"],
@@ -609,6 +639,128 @@ describe("analyzeRepo", () => {
       );
     }
   );
+
+  it.each([
+    ["legacy", analyzeRepo],
+    ["modular", analyzeRepoModular]
+  ])(
+    "%s analyzer keeps collision filenames stable across equivalent configs",
+    async (_entry, analyze) => {
+      const repoPath = await makeTmpDir();
+      const areas = [
+        { name: "UI/Web", applyTo: ["src/**", "styles/**"] },
+        { name: "UI-Web", applyTo: ["app/**"] },
+        { name: "docs", applyTo: ["documentation/**"] }
+      ];
+      const configPath = path.join(repoPath, "agentrc.config.json");
+      await fs.writeFile(configPath, JSON.stringify({ areas }));
+      const first = await analyze(repoPath);
+      const firstPaths = Object.fromEntries(
+        (first.areas ?? []).map((area) => [area.name, areaInstructionPath(repoPath, area)])
+      );
+
+      expect(new Set(Object.values(firstPaths)).size).toBe(3);
+      expect(firstPaths.docs).toBe(
+        path.join(repoPath, ".github", "instructions", "docs.instructions.md")
+      );
+
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          areas: [...areas].reverse().map((area) => ({
+            ...area,
+            applyTo: [...area.applyTo].reverse().map((pattern) => pattern.replace(/\//gu, "\\"))
+          }))
+        })
+      );
+      const second = await analyze(repoPath);
+
+      expect(
+        Object.fromEntries(
+          (second.areas ?? []).map((area) => [area.name, areaInstructionPath(repoPath, area)])
+        )
+      ).toEqual(firstPaths);
+    }
+  );
+
+  it.each([
+    ["legacy", analyzeRepo],
+    ["modular", analyzeRepoModular]
+  ])("%s analyzer disambiguates automatic areas without config", async (_entry, analyze) => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "package.json"),
+      JSON.stringify({ name: "root", workspaces: ["packages/*"] })
+    );
+    for (const [directory, name] of [
+      ["first", "@ui/web"],
+      ["second", "ui-web"]
+    ]) {
+      const packagePath = path.join(repoPath, "packages", directory);
+      await fs.mkdir(packagePath, { recursive: true });
+      await fs.writeFile(path.join(packagePath, "package.json"), JSON.stringify({ name }));
+    }
+
+    const result = await analyze(repoPath);
+
+    expect(result.areas).toHaveLength(2);
+    expect(new Set(result.areas?.map((area) => areaInstructionPath(repoPath, area))).size).toBe(2);
+    expect(result.areas?.map((area) => area.name).sort()).toEqual(["@ui/web", "ui-web"]);
+  });
+
+  it.each([
+    ["legacy", analyzeRepo],
+    ["modular", analyzeRepoModular]
+  ])("%s analyzer remaps parents to surviving config aliases", async (_entry, analyze) => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        areas: [
+          { name: "platform", applyTo: "src/**" },
+          { name: "api", applyTo: "src/api/**", parentArea: "platform" },
+          { name: "renamed", applyTo: ["src/**"] },
+          { name: "renamed", applyTo: "other/**" }
+        ],
+        workspaces: [
+          {
+            name: "product",
+            path: "packages",
+            areas: [
+              { name: "platform", applyTo: "lib/**" },
+              { name: "child", applyTo: "lib/child/**", parentArea: "platform" },
+              { name: "renamed", applyTo: "lib/**" },
+              { name: "renamed", applyTo: "other/**" }
+            ]
+          }
+        ]
+      })
+    );
+
+    const result = await analyze(repoPath);
+
+    expect(result.areas).toHaveLength(6);
+    expect(result.areas).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "renamed", applyTo: ["src/**"] }),
+        expect.objectContaining({ name: "api", parentArea: "renamed" }),
+        expect.objectContaining({ name: "product/renamed", applyTo: "packages/lib/**" }),
+        expect.objectContaining({ name: "product/child", parentArea: "product/renamed" })
+      ])
+    );
+    for (const [pattern, childName] of [
+      ["src/**", "api"],
+      ["packages/lib/**", "product/child"]
+    ]) {
+      const parent = result.areas?.find((area) =>
+        (Array.isArray(area.applyTo) ? area.applyTo : [area.applyTo]).includes(pattern)
+      );
+      expect(parent?.instructionName).toEqual(expect.any(String));
+      expect(result.areas?.find((area) => area.name === childName)?.parentInstructionName).toBe(
+        parent?.instructionName
+      );
+    }
+  });
 
   it("returns empty areas for empty directory", async () => {
     const repoPath = await makeTmpDir();
@@ -994,7 +1146,7 @@ describe("loadAgentrcConfig", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
     }
     tmpDirs.length = 0;
   });
@@ -1377,7 +1529,7 @@ describe("writeAreaInstruction", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
     }
     tmpDirs.length = 0;
   });
@@ -1438,7 +1590,7 @@ describe("loadAgentrcConfig workspaces", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
     }
     tmpDirs.length = 0;
   });
@@ -1634,7 +1786,7 @@ describe("detectWorkspaces", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
     }
     tmpDirs.length = 0;
   });
@@ -1731,7 +1883,7 @@ describe("analyzeRepo with workspace config", () => {
 
   afterEach(async () => {
     for (const dir of tmpDirs) {
-      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => { });
     }
     tmpDirs.length = 0;
   });

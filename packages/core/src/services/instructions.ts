@@ -183,7 +183,7 @@ export function buildRootContextSection(rootContent?: string): string {
     "",
     "## Root instructions already cover",
     "The root instruction file already covers the following workspace-wide content. " +
-      "Do NOT repeat or restate it in this file; cover only this area/crate's unique details:",
+    "Do NOT repeat or restate it in this file; cover only this area/crate's unique details:",
     "",
     trimmed,
     ""
@@ -347,7 +347,7 @@ export async function generateCopilotInstructions(
   options: GenerateInstructionsOptions
 ): Promise<string> {
   const repoPath = options.repoPath;
-  const progress = options.onProgress ?? (() => {});
+  const progress = options.onProgress ?? (() => { });
 
   progress("Checking Copilot CLI...");
   const cliConfig = await assertCopilotCliReady();
@@ -447,7 +447,7 @@ export async function generateAreaInstructions(
   options: GenerateAreaInstructionsOptions
 ): Promise<string> {
   const { repoPath, area } = options;
-  const progress = options.onProgress ?? (() => {});
+  const progress = options.onProgress ?? (() => { });
 
   progress(`Checking Copilot CLI for area "${area.name}"...`);
   const cliConfig = await assertCopilotCliReady();
@@ -571,7 +571,7 @@ export function areaInstructionPath(repoPath: string, area: Area): string {
     repoPath,
     ".github",
     "instructions",
-    `${sanitizeAreaName(area.name)}.instructions.md`
+    `${sanitizeAreaName(area.instructionName ?? area.name)}.instructions.md`
   );
 }
 
@@ -752,7 +752,7 @@ async function generateNestedHub(
     rootContent?: string;
   }
 ): Promise<HubResult> {
-  const progress = options.onProgress ?? (() => {});
+  const progress = options.onProgress ?? (() => { });
   const model = options.model ?? DEFAULT_MODEL;
 
   const existingCtx = await detectExistingInstructions(options.repoPath, options.detailDir);
@@ -854,7 +854,7 @@ async function generateNestedDetail(
     rootContent?: string;
   }
 ): Promise<string> {
-  const progress = options.onProgress ?? (() => {});
+  const progress = options.onProgress ?? (() => { });
   const model = options.model ?? DEFAULT_MODEL;
 
   const { tool: emitTool, getContent } = await createEmitTool();
@@ -940,7 +940,7 @@ export async function generateNestedInstructions(
     childAreas?: Area[];
   }
 ): Promise<NestedInstructionsResult> {
-  const progress = options.onProgress ?? (() => {});
+  const progress = options.onProgress ?? (() => { });
 
   progress("Checking Copilot CLI...");
   const cliConfig = await assertCopilotCliReady();

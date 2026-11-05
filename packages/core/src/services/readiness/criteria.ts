@@ -442,12 +442,12 @@ export function buildCriteria(): ReadinessCriterion[] {
             found.length > 0
               ? found
               : [
-                  ".vscode/mcp.json",
-                  ".vscode/settings.json (mcp section)",
-                  ".mcp.json",
-                  ".github/mcp.json",
-                  "<agent-plugin>/mcp.json"
-                ]
+                ".vscode/mcp.json",
+                ".vscode/settings.json (mcp section)",
+                ".mcp.json",
+                ".github/mcp.json",
+                "<agent-plugin>/mcp.json"
+              ]
         };
       }
     },
@@ -692,7 +692,7 @@ export function buildCriteria(): ReadinessCriterion[] {
         if (!area) {
           return { status: "skip", reason: "No area context." };
         }
-        const sanitized = sanitizeAreaName(area.name);
+        const sanitized = sanitizeAreaName(area.instructionName ?? area.name);
         const instructionPath = path.join(
           context.repoPath,
           ".github",

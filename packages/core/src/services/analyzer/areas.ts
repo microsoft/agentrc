@@ -1,9 +1,10 @@
+import { createHash } from "crypto";
 import path from "path";
 
 import { safeReadDir, readJson } from "../../utils/fs";
 
 import { isScannableDirectory } from "./apps";
-import { loadAgentrcConfig } from "./config";
+import { loadAgentrcConfig, sanitizeAreaName } from "./config";
 import type { AgentrcConfigArea } from "./config";
 import type { RepoApp, Area, RepoAnalysis } from "./types";
 
@@ -14,6 +15,39 @@ export function unique<T>(items: T[]): T[] {
 function areaIdentity(applyTo: Area["applyTo"]): string {
   const patterns = Array.isArray(applyTo) ? applyTo : [applyTo];
   return JSON.stringify(unique(patterns.map((pattern) => pattern.replace(/\\/gu, "/"))).sort());
+}
+
+export function assignAreaInstructionNames(areas: Area[]): Area[] {
+  const byName = new Map<string, Area[]>();
+  for (const area of areas) {
+    const name = sanitizeAreaName(area.name);
+    const group = byName.get(name) ?? [];
+    group.push(area);
+    byName.set(name, group);
+  }
+
+  const reservedNames = new Set(byName.keys());
+  for (const [name, group] of byName) {
+    if (group.length < 2) continue;
+    group.sort((left, right) =>
+      areaIdentity(left.applyTo).localeCompare(areaIdentity(right.applyTo))
+    );
+    for (const area of group) {
+      const hash = createHash("sha256")
+        .update(areaIdentity(area.applyTo))
+        .digest("hex")
+        .slice(0, 12);
+      const baseName = `${name}-${hash}`;
+      let instructionName = baseName;
+      let suffix = 2;
+      while (reservedNames.has(instructionName)) {
+        instructionName = `${baseName}-${suffix++}`;
+      }
+      area.instructionName = instructionName;
+      reservedNames.add(instructionName);
+    }
+  }
+  return areas;
 }
 
 const AREA_HEURISTIC_DIRS = [
@@ -249,7 +283,7 @@ async function resolveConfigArea(
   ca: AgentrcConfigArea
 ): Promise<Area | undefined> {
   const patterns = Array.isArray(ca.applyTo) ? ca.applyTo : [ca.applyTo];
-  const nonGlobPrefix = longestNonGlobPrefix(patterns[0]);
+  const nonGlobPrefix = longestNonGlobPrefix(patterns[0].replace(/\\/gu, "/"));
   const basePath = nonGlobPrefix ? path.join(repoPath, nonGlobPrefix) : repoPath;
 
   const resolved = path.resolve(basePath);
@@ -326,7 +360,9 @@ export async function detectAreas(repoPath: string, analysis: RepoAnalysis): Pro
 
   // Merge with config areas (flat + workspace)
   const config = await loadAgentrcConfig(repoPath);
-  if (!config?.areas?.length && !config?.workspaces?.length) return autoAreas;
+  if (!config?.areas?.length && !config?.workspaces?.length) {
+    return assignAreaInstructionNames(autoAreas);
+  }
 
   const resolvedRoot = path.resolve(repoPath);
   const configAreas: Area[] = [];
@@ -369,7 +405,21 @@ export async function detectAreas(repoPath: string, analysis: RepoAnalysis): Pro
     byIdentity.set(areaIdentity(area.applyTo), area);
   }
 
-  return Array.from(byIdentity.values());
+  const areas = assignAreaInstructionNames(Array.from(byIdentity.values()));
+  const identityByName = new Map(
+    configAreas.map((area) => [area.name.toLowerCase(), areaIdentity(area.applyTo)])
+  );
+  for (const area of areas) {
+    if (!area.parentArea) continue;
+    const parentIdentity = identityByName.get(area.parentArea.toLowerCase());
+    const parent = parentIdentity ? byIdentity.get(parentIdentity) : undefined;
+    if (parent) {
+      area.parentArea = parent.name;
+      if (parent.instructionName) area.parentInstructionName = parent.instructionName;
+    }
+  }
+
+  return areas;
 }
 
 // ─── Workspace detection ───
