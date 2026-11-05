@@ -200,10 +200,7 @@ export async function instructionsCommand(): Promise<void> {
             const allAreas = analysis!.areas ?? [];
             for (const area of selectedAreas) {
               reporter.update(`Generating nested instructions for ${area.name}…`);
-              const childAreas = allAreas.filter(
-                (a) =>
-                  (a.parentInstructionName ?? a.parentArea) === (area.instructionName ?? area.name)
-              );
+              const childAreas = allAreas.filter((a) => a.parentArea === area.name);
               const areaResult = await generateNestedAreaInstructions({
                 repoPath: workspacePath,
                 area,
@@ -269,7 +266,7 @@ export async function instructionsCommand(): Promise<void> {
                 model,
                 onProgress: (msg) => reporter.update(msg)
               });
-              areaBodies.set(area.instructionName ?? area.name, body);
+              areaBodies.set(area.name, body);
               if (body.trim()) {
                 const result = await writeAreaInstruction(workspacePath, area, body, false);
                 if (result.status === "skipped") areasSkipped++;
@@ -279,9 +276,7 @@ export async function instructionsCommand(): Promise<void> {
 
           const totalSkipped = (rootSkipped ? 1 : 0) + areasSkipped;
           const areasWithContent = selectedAreas
-            ? selectedAreas.filter((a) =>
-              (areaBodies.get(a.instructionName ?? a.name) ?? "").trim()
-            ).length
+            ? selectedAreas.filter((a) => (areaBodies.get(a.name) ?? "").trim()).length
             : 0;
           const totalFiles = (content.trim() ? 1 : 0) + areasWithContent;
 
@@ -300,7 +295,7 @@ export async function instructionsCommand(): Promise<void> {
                 }
                 if (selectedAreas) {
                   for (const area of selectedAreas) {
-                    const body = areaBodies.get(area.instructionName ?? area.name) ?? "";
+                    const body = areaBodies.get(area.name) ?? "";
                     if (body.trim()) {
                       await writeAreaInstruction(workspacePath, area, body, true);
                     }

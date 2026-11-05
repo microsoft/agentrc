@@ -10,7 +10,6 @@ export type RepoApp = {
 
 export type Area = {
   name: string;
-  instructionName?: string;
   description?: string;
   applyTo: string | string[];
   path?: string;
@@ -19,7 +18,6 @@ export type Area = {
   scripts?: Record<string, string>;
   hasTsConfig?: boolean;
   parentArea?: string;
-  parentInstructionName?: string;
   workingDirectory?: string;
 };
 

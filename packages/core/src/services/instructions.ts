@@ -571,7 +571,7 @@ export function areaInstructionPath(repoPath: string, area: Area): string {
     repoPath,
     ".github",
     "instructions",
-    `${sanitizeAreaName(area.instructionName ?? area.name)}.instructions.md`
+    `${sanitizeAreaName(area.name)}.instructions.md`
   );
 }
 

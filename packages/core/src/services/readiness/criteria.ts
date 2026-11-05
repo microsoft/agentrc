@@ -692,7 +692,7 @@ export function buildCriteria(): ReadinessCriterion[] {
         if (!area) {
           return { status: "skip", reason: "No area context." };
         }
-        const sanitized = sanitizeAreaName(area.instructionName ?? area.name);
+        const sanitized = sanitizeAreaName(area.name);
         const instructionPath = path.join(
           context.repoPath,
           ".github",

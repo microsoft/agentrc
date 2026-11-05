@@ -287,10 +287,7 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
 
           if (strategy === "nested") {
             // Nested: per-area AGENTS.md hub + detail files
-            const childAreas = areas.filter(
-              (a) =>
-                (a.parentInstructionName ?? a.parentArea) === (area.instructionName ?? area.name)
-            );
+            const childAreas = areas.filter((a) => a.parentArea === area.name);
             const nestedResult = await generateNestedAreaInstructions({
               repoPath,
               area,

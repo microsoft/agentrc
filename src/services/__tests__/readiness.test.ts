@@ -2,7 +2,6 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 
-import { writeAreaInstruction } from "@agentrc/core/services/instructions";
 import { runReadinessReport } from "@agentrc/core/services/readiness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -1089,39 +1088,6 @@ describe("runReadinessReport", () => {
       const frontendReport = report.areaReports!.find((ar) => ar.area.name === "frontend");
       const instrCriterion = frontendReport!.criteria.find((c) => c.id === "area-instructions");
       expect(instrCriterion?.status).toBe("pass");
-    });
-
-    it("recognizes distinct instruction files for same-named scopes", async () => {
-      await writePackageJson({ name: "test-repo" });
-      await writeFile("frontend/index.ts", "export {};");
-      await writeFile("src/frontend/index.ts", "export {};");
-      await writeFile(
-        "agentrc.config.json",
-        JSON.stringify({ areas: [{ name: "frontend", applyTo: "src/frontend/**" }] })
-      );
-      const before = await runReadinessReport({ repoPath, perArea: true });
-
-      expect(before.areaReports).toHaveLength(2);
-      expect(
-        before.areaReports?.map(
-          (areaReport) =>
-            areaReport.criteria.find((criterion) => criterion.id === "area-instructions")?.status
-        )
-      ).toEqual(["fail", "fail"]);
-      for (const { area } of before.areaReports ?? []) {
-        expect((await writeAreaInstruction(repoPath, area, `# ${area.applyTo}`)).status).toBe(
-          "written"
-        );
-      }
-
-      const after = await runReadinessReport({ repoPath, perArea: true });
-
-      expect(
-        after.areaReports?.map(
-          (areaReport) =>
-            areaReport.criteria.find((criterion) => criterion.id === "area-instructions")?.status
-        )
-      ).toEqual(["pass", "pass"]);
     });
 
     it("fails area-instructions when no matching instruction file", async () => {

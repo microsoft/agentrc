@@ -5,8 +5,6 @@ import fg from "fast-glob";
 
 import { fileExists, safeReadDir, readJson } from "../utils/fs";
 
-import { assignAreaInstructionNames } from "./analyzer/areas";
-
 export type RepoApp = {
   name: string;
   path: string;
@@ -19,7 +17,6 @@ export type RepoApp = {
 
 export type Area = {
   name: string;
-  instructionName?: string;
   description?: string;
   applyTo: string | string[];
   path?: string;
@@ -28,7 +25,6 @@ export type Area = {
   scripts?: Record<string, string>;
   hasTsConfig?: boolean;
   parentArea?: string;
-  parentInstructionName?: string;
   workingDirectory?: string;
 };
 
@@ -1087,9 +1083,7 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
 
   // Merge with config areas (flat + workspace)
   const config = await loadAgentrcConfig(repoPath);
-  if (!config?.areas?.length && !config?.workspaces?.length) {
-    return assignAreaInstructionNames(autoAreas);
-  }
+  if (!config?.areas?.length && !config?.workspaces?.length) return autoAreas;
 
   const resolvedRoot = path.resolve(repoPath);
   const configAreas: Area[] = [];
@@ -1132,7 +1126,7 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
     byIdentity.set(areaIdentity(area.applyTo), area);
   }
 
-  const areas = assignAreaInstructionNames(Array.from(byIdentity.values()));
+  const areas = Array.from(byIdentity.values());
   const identityByName = new Map(
     configAreas.map((area) => [area.name.toLowerCase(), areaIdentity(area.applyTo)])
   );
@@ -1142,7 +1136,6 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
     const parent = parentIdentity ? byIdentity.get(parentIdentity) : undefined;
     if (parent) {
       area.parentArea = parent.name;
-      if (parent.instructionName) area.parentInstructionName = parent.instructionName;
     }
   }
 
