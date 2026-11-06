@@ -210,7 +210,7 @@ describe("groupNestedAreas", () => {
       expect.objectContaining({
         name: "UI",
         applyTo: ["frontend/**", "frontend/**/*.tsx"],
-        path: path.join("/repo", "frontend"),
+        path: path.resolve("/repo", "frontend"),
         source: "config",
         description: "Configured UI",
         workingDirectory: "frontend",
@@ -219,6 +219,57 @@ describe("groupNestedAreas", () => {
       expect.objectContaining({ name: "components", parentArea: "UI" })
     ]));
     expect(areas).toEqual(original);
+  });
+
+  it("preserves an external parent supplied by non-preferred scopes and resolves its aliases", () => {
+    const grouped = groupNestedAreas("/repo", [
+      { name: "root", applyTo: "**", path: ".", source: "config" },
+      { name: "root-alias", applyTo: "**/*.md", path: ".", source: "config" },
+      { name: "UI", applyTo: "frontend/**/*.tsx", path: "frontend", source: "config" },
+      {
+        name: "UI-tests",
+        applyTo: "frontend/**/*.test.ts",
+        path: "frontend",
+        source: "config",
+        parentArea: "root-alias"
+      },
+      {
+        name: "UI-styles",
+        applyTo: "frontend/**/*.css",
+        path: "frontend",
+        source: "config",
+        parentArea: "root"
+      }
+    ]);
+
+    expect(grouped).toHaveLength(2);
+    expect(grouped.find((area) => area.name === "UI")?.parentArea).toBe("root");
+    expect(grouped.filter((area) => area.parentArea === "root").map((area) => area.name)).toEqual([
+      "UI"
+    ]);
+  });
+
+  it("rejects a nested hub with conflicting external parents", () => {
+    expect(() =>
+      groupNestedAreas("/repo", [
+        { name: "root", applyTo: "root/**", path: "root", source: "config" },
+        { name: "other-root", applyTo: "other/**", path: "other", source: "config" },
+        {
+          name: "UI",
+          applyTo: "frontend/**/*.tsx",
+          path: "frontend",
+          source: "config",
+          parentArea: "root"
+        },
+        {
+          name: "UI-tests",
+          applyTo: "frontend/**/*.test.ts",
+          path: "frontend",
+          source: "config",
+          parentArea: "other-root"
+        }
+      ])
+    ).toThrow('Nested hub "UI" has multiple external parents: other-root, root');
   });
 
   it("preserves every description and clears parents inside the same hub", () => {
@@ -1192,6 +1243,43 @@ describe("instruction generation sessions", () => {
     expect(content).toContain("Both scopes.");
     expect(content).toContain("frontend/**/*.tsx");
     expect(content).toContain("frontend/**/*.test.ts");
+  });
+
+  it("preserves nested parent and child prompts supplied by a non-preferred scope", async () => {
+    await fs.mkdir(path.join(tmpDir, "frontend"));
+    await fs.writeFile(
+      path.join(tmpDir, "agentrc.config.json"),
+      JSON.stringify({
+        areas: [
+          { name: "root", applyTo: "**/*.ts" },
+          { name: "UI", applyTo: "frontend/**/*.tsx" },
+          { name: "UI-tests", applyTo: "frontend/**/*.test.ts", parentArea: "root" }
+        ]
+      })
+    );
+    const root = createMockSession();
+    const child = createMockSession();
+    const { createSession } = mockClient([root.session, child.session]);
+    mockSdkTools();
+    const prompts: string[] = [];
+    for (const [index, generated] of [root, child].entries()) {
+      generated.session.sendAndWait.mockImplementation(async (args: { prompt: string }) => {
+        prompts.push(args.prompt);
+        const [config] = createSession.mock.calls[index] as unknown as [
+          { tools: Array<{ handler: Function }> }
+        ];
+        await config.tools[0].handler({ content: index === 0 ? "# Root hub" : "# UI hub" });
+      });
+    }
+
+    await instructionsCommand({ repo: tmpDir, strategy: "nested", areas: true, quiet: true });
+
+    expect(createSession).toHaveBeenCalledTimes(2);
+    expect(prompts[0]).toContain("- UI (");
+    expect(prompts[1]).toContain('This is a sub-project of "root"');
+    expect(await fs.readFile(path.join(tmpDir, "frontend", "AGENTS.md"), "utf8")).toContain(
+      "# UI hub"
+    );
   });
 
   it("includes root-directory scopes in the root hub without generating it twice", async () => {

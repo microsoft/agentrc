@@ -575,7 +575,7 @@ export function groupNestedAreas(repoPath: string, areas: Area[]): Area[] {
     byDirectory.set(directory, members);
   }
 
-  const grouped: Area[] = [];
+  const grouped: Array<{ area: Area; members: Area[] }> = [];
   const byOriginalName = new Map<string, Area>();
   for (const [directory, members] of byDirectory) {
     const preferred = [...members].sort(
@@ -596,15 +596,25 @@ export function groupNestedAreas(repoPath: string, areas: Area[]): Area[] {
       );
       area.description = Array.from(new Set(descriptions)).join("\n\n") || undefined;
     }
-    grouped.push(area);
+    grouped.push({ area, members });
     for (const member of members) byOriginalName.set(member.name.toLowerCase(), area);
   }
-  for (const area of grouped) {
-    if (!area.parentArea) continue;
-    const parent = byOriginalName.get(area.parentArea.toLowerCase());
-    if (parent) area.parentArea = parent === area ? undefined : parent.name;
+  for (const { area, members } of grouped) {
+    const externalParents = new Set<string>();
+    for (const member of members) {
+      if (!member.parentArea) continue;
+      const parent = byOriginalName.get(member.parentArea.toLowerCase());
+      if (parent !== area) externalParents.add(parent?.name ?? member.parentArea);
+    }
+    const parents = Array.from(externalParents).sort();
+    if (parents.length > 1) {
+      throw new Error(
+        `Nested hub "${area.name}" has multiple external parents: ${parents.join(", ")}`
+      );
+    }
+    area.parentArea = parents[0];
   }
-  return grouped;
+  return grouped.map(({ area }) => area);
 }
 
 export function areaInstructionPath(repoPath: string, area: Area): string {
