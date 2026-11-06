@@ -83,6 +83,7 @@ export {
   generateAreaInstructions,
   generateNestedInstructions,
   generateNestedAreaInstructions,
+  groupNestedAreas,
   writeAreaInstruction,
   writeNestedInstructions,
   detectExistingInstructions,

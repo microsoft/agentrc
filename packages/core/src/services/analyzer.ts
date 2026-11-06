@@ -951,14 +951,14 @@ async function areasFromHeuristics(repoPath: string): Promise<Area[]> {
  * small minimum-size threshold to reduce noise.
  */
 async function areasFromFallback(repoPath: string, existingAreas: Area[]): Promise<Area[]> {
-  const existingNames = new Set(existingAreas.map((a) => a.name.toLowerCase()));
+  const existingIdentities = new Set(existingAreas.map((area) => areaIdentity(area.applyTo)));
   const entries = await safeReadDir(repoPath);
   const areas: Area[] = [];
 
   for (const entry of entries) {
     if (entry.startsWith(".")) continue;
     if (FALLBACK_SKIP_DIRS.has(entry.toLowerCase())) continue;
-    if (existingNames.has(entry.toLowerCase())) continue;
+    if (existingIdentities.has(areaIdentity(`${entry}/**`))) continue;
 
     const fullPath = path.join(repoPath, entry);
     if (!(await isScannableDirectory(repoPath, fullPath))) continue;
@@ -1001,7 +1001,7 @@ async function resolveConfigArea(
   ca: AgentrcConfigArea
 ): Promise<Area | undefined> {
   const patterns = Array.isArray(ca.applyTo) ? ca.applyTo : [ca.applyTo];
-  const nonGlobPrefix = longestNonGlobPrefix(patterns[0]);
+  const nonGlobPrefix = longestNonGlobPrefix(patterns[0].replace(/\\/gu, "/"));
   const basePath = nonGlobPrefix ? path.join(repoPath, nonGlobPrefix) : repoPath;
 
   const resolved = path.resolve(basePath);
@@ -1033,6 +1033,37 @@ async function resolveConfigArea(
   };
 }
 
+function areaIdentity(applyTo: Area["applyTo"]): string {
+  const patterns = Array.isArray(applyTo) ? applyTo : [applyTo];
+  return JSON.stringify(unique(patterns.map((pattern) => pattern.replace(/\\/gu, "/"))).sort());
+}
+
+function disambiguateAreaNames(areas: Area[]): Area[] {
+  const reservedNames = new Set(areas.map((area) => sanitizeAreaName(area.name)));
+  const usedNames = new Set<string>();
+  const ordered = [...areas].sort(
+    (left, right) =>
+      Number(right.source === "config") - Number(left.source === "config") ||
+      areaIdentity(left.applyTo).localeCompare(areaIdentity(right.applyTo))
+  );
+  for (const area of ordered) {
+    const name = sanitizeAreaName(area.name);
+    if (!usedNames.has(name)) {
+      usedNames.add(name);
+      continue;
+    }
+    let suffix = 2;
+    let candidate: string;
+    do {
+      candidate = `${area.name}-${suffix++}`;
+    } while (reservedNames.has(sanitizeAreaName(candidate)));
+    area.name = candidate;
+    reservedNames.add(sanitizeAreaName(candidate));
+    usedNames.add(sanitizeAreaName(candidate));
+  }
+  return areas;
+}
+
 async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Area[]> {
   let autoAreas: Area[];
 
@@ -1041,11 +1072,11 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
     // Also run heuristics to catch non-app directories (docs, infra, etc.)
     const heuristicAreas = await areasFromHeuristics(repoPath);
     // Merge: app areas take precedence by name
-    const byName = new Map(heuristicAreas.map((a) => [a.name.toLowerCase(), a]));
-    for (const a of appAreas) {
-      byName.set(a.name.toLowerCase(), a);
+    const byIdentity = new Map(heuristicAreas.map((area) => [areaIdentity(area.applyTo), area]));
+    for (const area of appAreas) {
+      byIdentity.set(areaIdentity(area.applyTo), area);
     }
-    autoAreas = Array.from(byName.values());
+    autoAreas = Array.from(byIdentity.values());
   } else {
     autoAreas = await areasFromHeuristics(repoPath);
   }
@@ -1066,18 +1097,19 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
     topLevelDirCount > MIN_TOPLEVEL_DIRS_FOR_FALLBACK
   ) {
     const fallbackAreas = await areasFromFallback(repoPath, autoAreas);
-    const byName = new Map(autoAreas.map((a) => [a.name.toLowerCase(), a]));
-    for (const a of fallbackAreas) {
-      if (!byName.has(a.name.toLowerCase())) {
-        byName.set(a.name.toLowerCase(), a);
+    const byIdentity = new Map(autoAreas.map((area) => [areaIdentity(area.applyTo), area]));
+    for (const area of fallbackAreas) {
+      const identity = areaIdentity(area.applyTo);
+      if (!byIdentity.has(identity)) {
+        byIdentity.set(identity, area);
       }
     }
-    autoAreas = Array.from(byName.values());
+    autoAreas = Array.from(byIdentity.values());
   }
 
   // Merge with config areas (flat + workspace)
   const config = await loadAgentrcConfig(repoPath);
-  if (!config?.areas?.length && !config?.workspaces?.length) return autoAreas;
+  if (!config?.areas?.length && !config?.workspaces?.length) return disambiguateAreaNames(autoAreas);
 
   const resolvedRoot = path.resolve(repoPath);
   const configAreas: Area[] = [];
@@ -1115,12 +1147,25 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
   }
 
   // Config areas override auto-detected by name (case-insensitive)
-  const autoByName = new Map(autoAreas.map((a) => [a.name.toLowerCase(), a]));
-  for (const ca of configAreas) {
-    autoByName.set(ca.name.toLowerCase(), ca);
+  const byIdentity = new Map(autoAreas.map((area) => [areaIdentity(area.applyTo), area]));
+  for (const area of configAreas) {
+    byIdentity.set(areaIdentity(area.applyTo), area);
   }
 
-  return Array.from(autoByName.values());
+  const identityByName = new Map(
+    configAreas.map((area) => [area.name.toLowerCase(), areaIdentity(area.applyTo)])
+  );
+  const areas = disambiguateAreaNames(Array.from(byIdentity.values()));
+  for (const area of areas) {
+    if (!area.parentArea) continue;
+    const parentIdentity = identityByName.get(area.parentArea.toLowerCase());
+    const parent = parentIdentity ? byIdentity.get(parentIdentity) : undefined;
+    if (parent) {
+      area.parentArea = parent === area ? undefined : parent.name;
+    }
+  }
+
+  return areas;
 }
 
 // ─── Workspace detection ───

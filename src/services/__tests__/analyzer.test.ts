@@ -9,6 +9,7 @@ import {
   detectWorkspaces,
   type Area
 } from "@agentrc/core/services/analyzer";
+import { analyzeRepo as analyzeRepoModular } from "@agentrc/core/services/analyzer/index";
 import {
   buildAreaFrontmatter,
   buildAreaInstructionContent,
@@ -472,7 +473,10 @@ describe("analyzeRepo", () => {
     expect(result.areas?.[0].applyTo).toMatch(/\*\*$/u);
   });
 
-  it("config areas override auto-detected (case-insensitive)", async () => {
+  it.each([
+    ["legacy", analyzeRepo],
+    ["modular", analyzeRepoModular]
+  ])("%s analyzer retains same-named areas with different patterns", async (_entry, analyze) => {
     const repoPath = await makeTmpDir();
 
     // Create a heuristic area
@@ -487,16 +491,268 @@ describe("analyzeRepo", () => {
       })
     );
 
-    const result = await analyzeRepo(repoPath);
+    const result = await analyze(repoPath);
     const frontendArea = result.areas?.find((a) => a.name === "Frontend");
     expect(frontendArea).toBeDefined();
     expect(frontendArea?.source).toBe("config");
     expect(frontendArea?.applyTo).toBe("src/frontend/**");
     expect(frontendArea?.description).toBe("UI layer");
     // Should not have duplicate "frontend" (auto) + "Frontend" (config)
-    const frontendAreas = (result.areas ?? []).filter((a) => a.name.toLowerCase() === "frontend");
-    expect(frontendAreas.length).toBe(1);
+    const frontendAreas = (result.areas ?? []).filter((a) =>
+      ["frontend/**", "src/frontend/**"].includes(String(a.applyTo))
+    );
+    expect(frontendAreas).toHaveLength(2);
+    expect(frontendAreas).toContainEqual(
+      expect.objectContaining({ name: "frontend-2", applyTo: "frontend/**", source: "auto" })
+    );
+    const written = [];
+    for (const area of frontendAreas) {
+      written.push(await writeAreaInstruction(repoPath, area, `# ${area.applyTo}`));
+    }
+    expect(written.map((result) => result.status)).toEqual(["written", "written"]);
+    expect(new Set(written.map((result) => result.filePath)).size).toBe(2);
+    for (const area of frontendAreas) {
+      await writeAreaInstruction(repoPath, area, `# Updated ${area.applyTo}`, true);
+    }
+    for (const area of frontendAreas) {
+      expect(await fs.readFile(areaInstructionPath(repoPath, area), "utf8")).toContain(
+        `# Updated ${area.applyTo}`
+      );
+    }
   });
+
+  it.each([
+    ["legacy", analyzeRepo],
+    ["modular", analyzeRepoModular]
+  ])(
+    "%s analyzer prefers workspace config metadata for identical package patterns",
+    async (_entry, analyze) => {
+      const repoPath = await makeTmpDir();
+      await fs.writeFile(
+        path.join(repoPath, "package.json"),
+        JSON.stringify({ name: "root", workspaces: ["packages/*"] })
+      );
+      for (const name of ["web", "api"]) {
+        await fs.mkdir(path.join(repoPath, "packages", name), { recursive: true });
+        await fs.writeFile(
+          path.join(repoPath, "packages", name, "package.json"),
+          JSON.stringify({ name: `auto-${name}` })
+        );
+      }
+      await fs.writeFile(
+        path.join(repoPath, "agentrc.config.json"),
+        JSON.stringify({
+          workspaces: [
+            {
+              name: "product",
+              path: "packages",
+              areas: [
+                { name: "platform", applyTo: "api/**" },
+                {
+                  name: "frontend",
+                  applyTo: "web/**",
+                  description: "Configured UI",
+                  parentArea: "platform"
+                }
+              ]
+            }
+          ]
+        })
+      );
+
+      const result = await analyze(repoPath);
+
+      expect(result.apps?.map((app) => app.name).sort()).toEqual(["auto-api", "auto-web"]);
+      expect(result.areas).toHaveLength(2);
+      expect(result.areas?.filter((area) => area.applyTo === "packages/web/**")).toEqual([
+        expect.objectContaining({
+          name: "product/frontend",
+          applyTo: "packages/web/**",
+          source: "config",
+          description: "Configured UI",
+          parentArea: "product/platform",
+          workingDirectory: "packages",
+          path: path.join(repoPath, "packages", "web")
+        })
+      ]);
+      expect(result.areas).toContainEqual(
+        expect.objectContaining({
+          name: "product/platform",
+          applyTo: "packages/api/**",
+          source: "config"
+        })
+      );
+    }
+  );
+
+  it.each([
+    ["legacy", analyzeRepo],
+    ["modular", analyzeRepoModular]
+  ])(
+    "%s analyzer deduplicates normalized pattern sets without merging overlaps",
+    async (_entry, analyze) => {
+      const repoPath = await makeTmpDir();
+      await fs.mkdir(path.join(repoPath, "frontend"));
+      await fs.writeFile(path.join(repoPath, "frontend", "index.ts"), "export {};");
+      await fs.writeFile(
+        path.join(repoPath, "frontend", "package.json"),
+        JSON.stringify({ scripts: { build: "tsc" } })
+      );
+      await fs.writeFile(path.join(repoPath, "frontend", "tsconfig.json"), "{}");
+      await fs.writeFile(
+        path.join(repoPath, "agentrc.config.json"),
+        JSON.stringify({
+          areas: [
+            { name: "UI", applyTo: ["frontend\\**"] },
+            { name: "shared", applyTo: ["shared/**", "common/**"] },
+            {
+              name: "libraries",
+              applyTo: ["common\\**", "shared/**", "shared/**"],
+              description: "Configured libraries"
+            },
+            { name: "shared", applyTo: ["shared/**", "extra/**"] },
+            { name: "UI", applyTo: "frontend/components/**" }
+          ]
+        })
+      );
+
+      const result = await analyze(repoPath);
+
+      expect(result.areas).toHaveLength(4);
+      expect(result.areas).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: "UI",
+            applyTo: ["frontend\\**"],
+            source: "config",
+            path: path.join(repoPath, "frontend"),
+            scripts: { build: "tsc" },
+            hasTsConfig: true
+          }),
+          expect.objectContaining({
+            name: "libraries",
+            applyTo: ["common\\**", "shared/**", "shared/**"],
+            description: "Configured libraries"
+          }),
+          expect.objectContaining({ name: "shared", applyTo: ["shared/**", "extra/**"] }),
+          expect.objectContaining({ name: "UI-2", applyTo: "frontend/components/**" })
+        ])
+      );
+    }
+  );
+
+  it.each([
+    ["legacy", analyzeRepo],
+    ["modular", analyzeRepoModular]
+  ])("%s analyzer remaps parents to surviving config aliases", async (_entry, analyze) => {
+    const repoPath = await makeTmpDir();
+    await fs.writeFile(
+      path.join(repoPath, "agentrc.config.json"),
+      JSON.stringify({
+        areas: [
+          { name: "platform", applyTo: "src/**" },
+          { name: "api", applyTo: "src/api/**", parentArea: "platform" },
+          { name: "renamed", applyTo: ["src/**"], parentArea: "platform" }
+        ],
+        workspaces: [
+          {
+            name: "product",
+            path: "packages",
+            areas: [
+              { name: "platform", applyTo: "lib/**" },
+              { name: "child", applyTo: "lib/child/**", parentArea: "platform" },
+              { name: "renamed", applyTo: "lib/**", parentArea: "platform" }
+            ]
+          }
+        ]
+      })
+    );
+
+    const result = await analyze(repoPath);
+
+    expect(result.areas).toHaveLength(4);
+    expect(result.areas).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "renamed", applyTo: ["src/**"], parentArea: undefined }),
+        expect.objectContaining({ name: "api", parentArea: "renamed" }),
+        expect.objectContaining({
+          name: "product/renamed",
+          applyTo: "packages/lib/**",
+          parentArea: undefined
+        }),
+        expect.objectContaining({ name: "product/child", parentArea: "product/renamed" })
+      ])
+    );
+  });
+
+  it.each([
+    ["legacy", analyzeRepo],
+    ["modular", analyzeRepoModular]
+  ])(
+    "%s analyzer allocates stable names without taking reserved filenames",
+    async (_entry, analyze) => {
+      const repoPath = await makeTmpDir();
+      await fs.writeFile(
+        path.join(repoPath, "package.json"),
+        JSON.stringify({ name: "root", workspaces: ["packages/*"] })
+      );
+      for (const [directory, name] of [
+        ["first", "@tools/cli"],
+        ["second", "tools-cli"]
+      ]) {
+        const packagePath = path.join(repoPath, "packages", directory);
+        await fs.mkdir(packagePath, { recursive: true });
+        await fs.writeFile(path.join(packagePath, "package.json"), JSON.stringify({ name }));
+      }
+      const automatic = await analyze(repoPath);
+      expect(automatic.areas).toHaveLength(2);
+      const automaticPaths = automatic.areas?.map((area) => areaInstructionPath(repoPath, area));
+      expect(new Set(automaticPaths).size).toBe(2);
+
+      const areas = [
+        { name: "UI/Web", applyTo: ["src/**", "styles/**"] },
+        { name: "UI-Web", applyTo: ["app/**"] },
+        { name: "UI-Web-2", applyTo: ["other/**"] },
+        { name: "child", applyTo: ["src/child/**"], parentArea: "UI/Web" }
+      ];
+      const configPath = path.join(repoPath, "agentrc.config.json");
+      await fs.writeFile(configPath, JSON.stringify({ areas }));
+      const first = await analyze(repoPath);
+
+      expect(first.areas).toHaveLength(6);
+      expect(new Set(first.areas?.map((area) => areaInstructionPath(repoPath, area))).size).toBe(6);
+      expect(first.areas).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "UI-Web", applyTo: ["app/**"] }),
+          expect.objectContaining({ name: "UI-Web-2", applyTo: ["other/**"] }),
+          expect.objectContaining({ name: "UI/Web-3", applyTo: ["src/**", "styles/**"] }),
+          expect.objectContaining({ name: "child", parentArea: "UI/Web-3" })
+        ])
+      );
+
+      await fs.writeFile(
+        configPath,
+        JSON.stringify({
+          areas: [...areas].reverse().map((area) => ({
+            ...area,
+            applyTo: [...area.applyTo].reverse().map((pattern) => pattern.replace(/\//gu, "\\"))
+          }))
+        })
+      );
+      const second = await analyze(repoPath);
+      const namesByPattern = (detected: Area[] = []) =>
+        Object.fromEntries(
+          detected.map((area) => [
+            (Array.isArray(area.applyTo) ? area.applyTo : [area.applyTo])
+              .map((pattern) => pattern.replace(/\\/gu, "/"))
+              .sort()
+              .join("\n"),
+            area.name
+          ])
+        );
+      expect(namesByPattern(second.areas)).toEqual(namesByPattern(first.areas));
+    }
+  );
 
   it("returns empty areas for empty directory", async () => {
     const repoPath = await makeTmpDir();

@@ -566,6 +566,57 @@ export function buildAreaInstructionContent(area: Area, body: string): string {
   return `${buildAreaFrontmatter(area)}\n\n${body}\n`;
 }
 
+export function groupNestedAreas(repoPath: string, areas: Area[]): Area[] {
+  const byDirectory = new Map<string, Area[]>();
+  for (const area of areas) {
+    const directory = path.resolve(repoPath, area.path ?? ".");
+    const members = byDirectory.get(directory) ?? [];
+    members.push(area);
+    byDirectory.set(directory, members);
+  }
+
+  const grouped: Array<{ area: Area; members: Area[] }> = [];
+  const byOriginalName = new Map<string, Area>();
+  for (const [directory, members] of byDirectory) {
+    const preferred = [...members].sort(
+      (left, right) =>
+        Number(right.source === "config") - Number(left.source === "config") ||
+        left.name.localeCompare(right.name)
+    )[0];
+    const area = { ...preferred, path: directory };
+    if (members.length > 1) {
+      area.applyTo = Array.from(
+        new Set(members.flatMap((member) =>
+          (Array.isArray(member.applyTo) ? member.applyTo : [member.applyTo])
+            .map((pattern) => pattern.replace(/\\/gu, "/"))
+        ))
+      ).sort();
+      const descriptions = members.flatMap(
+        (member) => member.description ? [member.description] : []
+      );
+      area.description = Array.from(new Set(descriptions)).join("\n\n") || undefined;
+    }
+    grouped.push({ area, members });
+    for (const member of members) byOriginalName.set(member.name.toLowerCase(), area);
+  }
+  for (const { area, members } of grouped) {
+    const externalParents = new Set<string>();
+    for (const member of members) {
+      if (!member.parentArea) continue;
+      const parent = byOriginalName.get(member.parentArea.toLowerCase());
+      if (parent !== area) externalParents.add(parent?.name ?? member.parentArea);
+    }
+    const parents = Array.from(externalParents).sort();
+    if (parents.length > 1) {
+      throw new Error(
+        `Nested hub "${area.name}" has multiple external parents: ${parents.join(", ")}`
+      );
+    }
+    area.parentArea = parents[0];
+  }
+  return grouped.map(({ area }) => area);
+}
+
 export function areaInstructionPath(repoPath: string, area: Area): string {
   return path.join(
     repoPath,
