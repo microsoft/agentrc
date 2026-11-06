@@ -10,6 +10,7 @@ import {
   generateCopilotInstructions,
   generateNestedInstructions,
   generateNestedAreaInstructions,
+  groupNestedAreas,
   writeAreaInstruction,
   writeInstructionFile,
   writeNestedInstructions,
@@ -25,6 +26,8 @@ import {
 } from "@agentrc/core/services/instructions";
 import type { NestedInstructionsResult } from "@agentrc/core/services/instructions";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { instructionsCommand } from "../../commands/instructions";
 
 describe("writeAreaInstruction", () => {
   let tmpDir: string;
@@ -174,6 +177,68 @@ describe("buildAreaInstructionContent", () => {
     expect(content).toMatch(/---\n\n# API Guidelines/);
     expect(content).toContain("Follow REST conventions.");
     expect(content).toMatch(/\n$/);
+  });
+});
+
+describe("groupNestedAreas", () => {
+  it("combines scopes by directory and remaps children without changing the original areas", () => {
+    const areas: Area[] = [
+      { name: "frontend", applyTo: "frontend/**", path: "frontend", source: "auto" },
+      {
+        name: "UI",
+        applyTo: ["frontend\\**\\*.tsx", "frontend/**"],
+        path: path.join("/repo", "frontend"),
+        source: "config",
+        description: "Configured UI",
+        workingDirectory: "frontend",
+        parentArea: "frontend"
+      },
+      {
+        name: "components",
+        applyTo: "frontend/components/**",
+        path: "frontend/components",
+        source: "config",
+        parentArea: "frontend"
+      }
+    ];
+    const original = structuredClone(areas);
+
+    const grouped = groupNestedAreas("/repo", areas);
+
+    expect(grouped).toHaveLength(2);
+    expect(grouped).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: "UI",
+        applyTo: ["frontend/**", "frontend/**/*.tsx"],
+        path: path.join("/repo", "frontend"),
+        source: "config",
+        description: "Configured UI",
+        workingDirectory: "frontend",
+        parentArea: undefined
+      }),
+      expect.objectContaining({ name: "components", parentArea: "UI" })
+    ]));
+    expect(areas).toEqual(original);
+  });
+
+  it("preserves every description and clears parents inside the same hub", () => {
+    const grouped = groupNestedAreas("/repo", [
+      { name: "api", applyTo: "api/**/*.ts", path: "api", source: "config", description: "API code" },
+      {
+        name: "tests",
+        applyTo: "api/**/*.test.ts",
+        path: "./api",
+        source: "config",
+        description: "API tests",
+        parentArea: "api"
+      }
+    ]);
+
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0].description).toContain("API code");
+    expect(grouped[0].description).toContain("API tests");
+    expect(grouped[0].parentArea).toBeUndefined();
+    expect(grouped[0].applyTo).toEqual(["api/**/*.test.ts", "api/**/*.ts"]);
   });
 });
 
@@ -1093,6 +1158,67 @@ describe("instruction generation sessions", () => {
         claudeMd: false
       })
     ).rejects.toThrow("Copilot CLI not logged in. Run `copilot` then `/login` to authenticate.");
+  });
+
+  it.each([undefined, "UI-tests"])("generates one combined nested hub when selecting %s", async (selected) => {
+    await fs.mkdir(path.join(tmpDir, "frontend"));
+    await fs.writeFile(path.join(tmpDir, "frontend", "index.ts"), "export {};");
+    await fs.writeFile(path.join(tmpDir, "agentrc.config.json"), JSON.stringify({
+      areas: [
+        { name: "UI", applyTo: "frontend/**/*.tsx", description: "UI scope" },
+        { name: "UI-tests", applyTo: "frontend/**/*.test.ts", description: "Test scope" }
+      ]
+    }));
+    const hub = createMockSession();
+    const { createSession } = mockClient([hub.session]);
+    mockSdkTools();
+    let sentPrompt = "";
+    hub.session.sendAndWait.mockImplementation(async (args: { prompt: string }) => {
+      sentPrompt = args.prompt;
+      const [config] = createSession.mock.calls[0] as unknown as [
+        { tools: Array<{ handler: Function }> }
+      ];
+      await config.tools[0].handler({ content: "# Combined hub\n\nBoth scopes." });
+    });
+
+    await instructionsCommand({ repo: tmpDir, strategy: "nested", areasOnly: true, area: selected, quiet: true });
+
+    expect(createSession).toHaveBeenCalledTimes(1);
+    expect(sentPrompt).toContain("frontend/**/*.tsx");
+    expect(sentPrompt).toContain("frontend/**/*.test.ts");
+    expect(sentPrompt).toContain("UI scope");
+    expect(sentPrompt).toContain("Test scope");
+    const content = await fs.readFile(path.join(tmpDir, "frontend", "AGENTS.md"), "utf8");
+    expect(content).toContain("Both scopes.");
+    expect(content).toContain("frontend/**/*.tsx");
+    expect(content).toContain("frontend/**/*.test.ts");
+  });
+
+  it("includes root-directory scopes in the root hub without generating it twice", async () => {
+    await fs.writeFile(path.join(tmpDir, "agentrc.config.json"), JSON.stringify({
+      areas: [{ name: "TypeScript", applyTo: "**/*.ts", description: "Root TypeScript scope" }]
+    }));
+    const hub = createMockSession();
+    const { createSession } = mockClient([hub.session]);
+    mockSdkTools();
+    let sentPrompt = "";
+    hub.session.sendAndWait.mockImplementation(async (args: { prompt: string }) => {
+      sentPrompt = args.prompt;
+      const [config] = createSession.mock.calls[0] as unknown as [
+        { tools: Array<{ handler: Function }> }
+      ];
+      await config.tools[0].handler({ content: "# Root hub\n\nRoot scope covered." });
+    });
+
+    await instructionsCommand({ repo: tmpDir, strategy: "nested", areas: true, quiet: true });
+
+    expect(createSession).toHaveBeenCalledTimes(1);
+    expect(sentPrompt).toContain("Root TypeScript scope");
+    expect(sentPrompt).toContain("**/*.ts");
+    const content = await fs.readFile(path.join(tmpDir, "AGENTS.md"), "utf8");
+    expect(content).toContain("Root scope covered.");
+    expect(content).toContain('"**"');
+    expect(content).toContain("**/*.ts");
   });
 
   it("propagates root content and normalizes headings for nested area generation", async () => {

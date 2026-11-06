@@ -8,6 +8,7 @@ import {
   generateAreaInstructions,
   generateNestedInstructions,
   generateNestedAreaInstructions,
+  groupNestedAreas,
   areaInstructionPath,
   writeAreaInstruction,
   writeNestedInstructions
@@ -79,6 +80,12 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
     // Root instruction content, propagated to per-area generation so area/crate
     // files don't duplicate what the root file already covers.
     let rootContent: string | undefined;
+    const nestedAnalysis = strategy === "nested" && wantAreas
+      ? await analyzeRepo(repoPath)
+      : undefined;
+    const nestedAreas = groupNestedAreas(repoPath, nestedAnalysis?.areas ?? []);
+    const rootArea = nestedAreas.find((area) => area.path === repoPath);
+    let rootNestedGenerated = false;
 
     // Generate root instructions unless --areas-only
     if (!options.areasOnly && !options.area) {
@@ -88,11 +95,25 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
           progress.update("Generating nested instructions...");
           const nestedResult = await generateNestedInstructions({
             repoPath,
+            area: rootArea
+              ? {
+                  ...rootArea,
+                  path: ".",
+                  applyTo: Array.from(new Set([
+                    "**",
+                    ...(Array.isArray(rootArea.applyTo) ? rootArea.applyTo : [rootArea.applyTo])
+                  ]))
+                }
+              : undefined,
+            childAreas: rootArea
+              ? nestedAreas.filter((area) => area.parentArea === rootArea.name)
+              : undefined,
             model: options.model,
             onProgress: shouldLog(options) ? (msg) => progress.update(msg) : undefined,
             detailDir,
             claudeMd
           });
+          rootNestedGenerated = true;
           if (options.dryRun) {
             rootContent = nestedResult.hub.content;
             const dryFiles = [
@@ -243,7 +264,7 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
     if (wantAreas) {
       let analysis;
       try {
-        analysis = await analyzeRepo(repoPath);
+        analysis = nestedAnalysis ?? await analyzeRepo(repoPath);
       } catch (error) {
         outputError(
           `Failed to analyze repository: ${error instanceof Error ? error.message : String(error)}`,
@@ -273,11 +294,22 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
         return;
       }
 
+      const targetDirectories = new Set(
+        targetAreas.map((area) => path.resolve(repoPath, area.path ?? "."))
+      );
+      const generationAreas = strategy === "nested"
+        ? nestedAreas.filter(
+            (area) =>
+              targetDirectories.has(path.resolve(repoPath, area.path ?? ".")) &&
+              !(rootNestedGenerated && area.path === repoPath)
+          )
+        : targetAreas;
+
       if (shouldLog(options)) {
-        progress.update(`Generating instructions for ${targetAreas.length} area(s)...`);
+        progress.update(`Generating instructions for ${generationAreas.length} area(s)...`);
       }
 
-      for (const area of targetAreas) {
+      for (const area of generationAreas) {
         try {
           if (shouldLog(options)) {
             progress.update(
@@ -287,7 +319,7 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
 
           if (strategy === "nested") {
             // Nested: per-area AGENTS.md hub + detail files
-            const childAreas = areas.filter((a) => a.parentArea === area.name);
+            const childAreas = nestedAreas.filter((a) => a.parentArea === area.name);
             const nestedResult = await generateNestedAreaInstructions({
               repoPath,
               area,

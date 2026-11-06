@@ -6,6 +6,7 @@ import {
   generateAreaInstructions,
   generateNestedInstructions,
   generateNestedAreaInstructions,
+  groupNestedAreas,
   writeAreaInstruction,
   writeNestedInstructions,
   safeWriteFile,
@@ -151,9 +152,12 @@ export async function instructionsCommand(): Promise<void> {
 
   // Collect area selections before starting generation progress
   let selectedAreas: typeof analysis.areas = undefined;
-  if (analysis.areas && analysis.areas.length > 0) {
+  const availableAreas = strategy === "nested"
+    ? groupNestedAreas(workspacePath, analysis.areas ?? [])
+    : analysis.areas;
+  if (availableAreas && availableAreas.length > 0) {
     const picked = await vscode.window.showQuickPick(
-      analysis.areas.map((a) => ({
+      availableAreas.map((a) => ({
         label: a.name,
         description: a.description,
         detail: Array.isArray(a.applyTo) ? a.applyTo.join(", ") : a.applyTo,
@@ -181,8 +185,22 @@ export async function instructionsCommand(): Promise<void> {
         if (strategy === "nested") {
           // Nested strategy: generate hub + detail files
           reporter.update("Generating nested instructions…");
+          const rootArea = selectedAreas?.find((area) => area.path === workspacePath);
           const nestedResult = await generateNestedInstructions({
             repoPath: workspacePath,
+            area: rootArea
+              ? {
+                  ...rootArea,
+                  path: ".",
+                  applyTo: Array.from(new Set([
+                    "**",
+                    ...(Array.isArray(rootArea.applyTo) ? rootArea.applyTo : [rootArea.applyTo])
+                  ]))
+                }
+              : undefined,
+            childAreas: rootArea
+              ? availableAreas?.filter((area) => area.parentArea === rootArea.name)
+              : undefined,
             model,
             onProgress: (msg) => reporter.update(msg),
             detailDir,
@@ -197,8 +215,8 @@ export async function instructionsCommand(): Promise<void> {
 
           // Handle areas for nested
           if (selectedAreas) {
-            const allAreas = analysis!.areas ?? [];
-            for (const area of selectedAreas) {
+            const allAreas = availableAreas ?? [];
+            for (const area of selectedAreas.filter((area) => area.path !== workspacePath)) {
               reporter.update(`Generating nested instructions for ${area.name}…`);
               const childAreas = allAreas.filter((a) => a.parentArea === area.name);
               const areaResult = await generateNestedAreaInstructions({

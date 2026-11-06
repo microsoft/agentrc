@@ -566,6 +566,47 @@ export function buildAreaInstructionContent(area: Area, body: string): string {
   return `${buildAreaFrontmatter(area)}\n\n${body}\n`;
 }
 
+export function groupNestedAreas(repoPath: string, areas: Area[]): Area[] {
+  const byDirectory = new Map<string, Area[]>();
+  for (const area of areas) {
+    const directory = path.resolve(repoPath, area.path ?? ".");
+    const members = byDirectory.get(directory) ?? [];
+    members.push(area);
+    byDirectory.set(directory, members);
+  }
+
+  const grouped: Area[] = [];
+  const byOriginalName = new Map<string, Area>();
+  for (const [directory, members] of byDirectory) {
+    const preferred = [...members].sort(
+      (left, right) =>
+        Number(right.source === "config") - Number(left.source === "config") ||
+        left.name.localeCompare(right.name)
+    )[0];
+    const area = { ...preferred, path: directory };
+    if (members.length > 1) {
+      area.applyTo = Array.from(
+        new Set(members.flatMap((member) =>
+          (Array.isArray(member.applyTo) ? member.applyTo : [member.applyTo])
+            .map((pattern) => pattern.replace(/\\/gu, "/"))
+        ))
+      ).sort();
+      const descriptions = members.flatMap(
+        (member) => member.description ? [member.description] : []
+      );
+      area.description = Array.from(new Set(descriptions)).join("\n\n") || undefined;
+    }
+    grouped.push(area);
+    for (const member of members) byOriginalName.set(member.name.toLowerCase(), area);
+  }
+  for (const area of grouped) {
+    if (!area.parentArea) continue;
+    const parent = byOriginalName.get(area.parentArea.toLowerCase());
+    if (parent) area.parentArea = parent === area ? undefined : parent.name;
+  }
+  return grouped;
+}
+
 export function areaInstructionPath(repoPath: string, area: Area): string {
   return path.join(
     repoPath,

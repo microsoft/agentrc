@@ -6,6 +6,7 @@ export {
   generateAreaInstructions,
   generateNestedInstructions,
   generateNestedAreaInstructions,
+  groupNestedAreas,
   writeAreaInstruction,
   writeNestedInstructions
 } from "@agentrc/core/services/instructions";
