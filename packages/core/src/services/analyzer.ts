@@ -1038,6 +1038,32 @@ function areaIdentity(applyTo: Area["applyTo"]): string {
   return JSON.stringify(unique(patterns.map((pattern) => pattern.replace(/\\/gu, "/"))).sort());
 }
 
+function disambiguateAreaNames(areas: Area[]): Area[] {
+  const reservedNames = new Set(areas.map((area) => sanitizeAreaName(area.name)));
+  const usedNames = new Set<string>();
+  const ordered = [...areas].sort(
+    (left, right) =>
+      Number(right.source === "config") - Number(left.source === "config") ||
+      areaIdentity(left.applyTo).localeCompare(areaIdentity(right.applyTo))
+  );
+  for (const area of ordered) {
+    const name = sanitizeAreaName(area.name);
+    if (!usedNames.has(name)) {
+      usedNames.add(name);
+      continue;
+    }
+    let suffix = 2;
+    let candidate: string;
+    do {
+      candidate = `${area.name}-${suffix++}`;
+    } while (reservedNames.has(sanitizeAreaName(candidate)));
+    area.name = candidate;
+    reservedNames.add(sanitizeAreaName(candidate));
+    usedNames.add(sanitizeAreaName(candidate));
+  }
+  return areas;
+}
+
 async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Area[]> {
   let autoAreas: Area[];
 
@@ -1083,7 +1109,7 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
 
   // Merge with config areas (flat + workspace)
   const config = await loadAgentrcConfig(repoPath);
-  if (!config?.areas?.length && !config?.workspaces?.length) return autoAreas;
+  if (!config?.areas?.length && !config?.workspaces?.length) return disambiguateAreaNames(autoAreas);
 
   const resolvedRoot = path.resolve(repoPath);
   const configAreas: Area[] = [];
@@ -1126,10 +1152,10 @@ async function detectAreas(repoPath: string, analysis: RepoAnalysis): Promise<Ar
     byIdentity.set(areaIdentity(area.applyTo), area);
   }
 
-  const areas = Array.from(byIdentity.values());
   const identityByName = new Map(
     configAreas.map((area) => [area.name.toLowerCase(), areaIdentity(area.applyTo)])
   );
+  const areas = disambiguateAreaNames(Array.from(byIdentity.values()));
   for (const area of areas) {
     if (!area.parentArea) continue;
     const parentIdentity = identityByName.get(area.parentArea.toLowerCase());
