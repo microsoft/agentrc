@@ -442,12 +442,12 @@ export function buildCriteria(): ReadinessCriterion[] {
             found.length > 0
               ? found
               : [
-                ".vscode/mcp.json",
-                ".vscode/settings.json (mcp section)",
-                ".mcp.json",
-                ".github/mcp.json",
-                "<agent-plugin>/mcp.json"
-              ]
+                  ".vscode/mcp.json",
+                  ".vscode/settings.json (mcp section)",
+                  ".mcp.json",
+                  ".github/mcp.json",
+                  "<agent-plugin>/mcp.json"
+                ]
         };
       }
     },

@@ -29,18 +29,18 @@ export type RepoAnalysis = {
   packageManager?: string;
   isMonorepo?: boolean;
   workspaceType?:
-  | "npm"
-  | "pnpm"
-  | "yarn"
-  | "cargo"
-  | "go"
-  | "dotnet"
-  | "gradle"
-  | "maven"
-  | "bazel"
-  | "nx"
-  | "pants"
-  | "turborepo";
+    | "npm"
+    | "pnpm"
+    | "yarn"
+    | "cargo"
+    | "go"
+    | "dotnet"
+    | "gradle"
+    | "maven"
+    | "bazel"
+    | "nx"
+    | "pants"
+    | "turborepo";
   workspacePatterns?: string[];
   apps?: RepoApp[];
   areas?: Area[];

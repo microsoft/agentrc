@@ -100,11 +100,11 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
               ...nestedResult.details.map((d) => ({ path: d.relativePath, content: d.content })),
               ...(nestedResult.claudeMd
                 ? [
-                  {
-                    path: nestedResult.claudeMd.relativePath,
-                    content: nestedResult.claudeMd.content
-                  }
-                ]
+                    {
+                      path: nestedResult.claudeMd.relativePath,
+                      content: nestedResult.claudeMd.content
+                    }
+                  ]
                 : [])
             ];
             for (const file of dryFiles) {
@@ -207,11 +207,11 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
               const why = reason === "symlink" ? "path is a symlink" : "file exists (use --force)";
               if (options.json) {
                 const result: CommandResult<{ outputPath: string; skipped: true; reason: string }> =
-                {
-                  ok: true,
-                  status: "noop",
-                  data: { outputPath, skipped: true, reason: why }
-                };
+                  {
+                    ok: true,
+                    status: "noop",
+                    data: { outputPath, skipped: true, reason: why }
+                  };
                 outputResult(result, true);
               } else if (shouldLog(options)) {
                 progress.update(`Skipped ${relPath}: ${why}`);
@@ -304,11 +304,11 @@ export async function instructionsCommand(options: InstructionsOptions): Promise
                 ...nestedResult.details.map((d) => ({ path: d.relativePath, content: d.content })),
                 ...(nestedResult.claudeMd
                   ? [
-                    {
-                      path: nestedResult.claudeMd.relativePath,
-                      content: nestedResult.claudeMd.content
-                    }
-                  ]
+                      {
+                        path: nestedResult.claudeMd.relativePath,
+                        content: nestedResult.claudeMd.content
+                      }
+                    ]
                   : [])
               ];
               for (const file of dryFiles) {

@@ -36,18 +36,18 @@ export type RepoAnalysis = {
   packageManager?: string;
   isMonorepo?: boolean;
   workspaceType?:
-  | "npm"
-  | "pnpm"
-  | "yarn"
-  | "cargo"
-  | "go"
-  | "dotnet"
-  | "gradle"
-  | "maven"
-  | "bazel"
-  | "nx"
-  | "pants"
-  | "turborepo";
+    | "npm"
+    | "pnpm"
+    | "yarn"
+    | "cargo"
+    | "go"
+    | "dotnet"
+    | "gradle"
+    | "maven"
+    | "bazel"
+    | "nx"
+    | "pants"
+    | "turborepo";
   workspacePatterns?: string[];
   apps?: RepoApp[];
   areas?: Area[];
@@ -384,8 +384,8 @@ async function resolveWorkspaceApps(
 
   const packageJsonPaths = workspacePatterns.length
     ? (
-      await fg(workspacePatterns, { cwd: repoPath, absolute: true, onlyFiles: true, dot: false })
-    ).map((p) => path.normalize(p))
+        await fg(workspacePatterns, { cwd: repoPath, absolute: true, onlyFiles: true, dot: false })
+      ).map((p) => path.normalize(p))
     : [];
 
   if (!packageJsonPaths.length && rootPackageJson) {
