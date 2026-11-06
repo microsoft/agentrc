@@ -378,7 +378,7 @@ export async function detectAreas(repoPath: string, analysis: RepoAnalysis): Pro
     const parentIdentity = identityByName.get(area.parentArea.toLowerCase());
     const parent = parentIdentity ? byIdentity.get(parentIdentity) : undefined;
     if (parent) {
-      area.parentArea = parent.name;
+      area.parentArea = parent === area ? undefined : parent.name;
     }
   }
 

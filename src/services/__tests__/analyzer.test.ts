@@ -636,7 +636,7 @@ describe("analyzeRepo", () => {
         areas: [
           { name: "platform", applyTo: "src/**" },
           { name: "api", applyTo: "src/api/**", parentArea: "platform" },
-          { name: "renamed", applyTo: ["src/**"] }
+          { name: "renamed", applyTo: ["src/**"], parentArea: "platform" }
         ],
         workspaces: [
           {
@@ -645,7 +645,7 @@ describe("analyzeRepo", () => {
             areas: [
               { name: "platform", applyTo: "lib/**" },
               { name: "child", applyTo: "lib/child/**", parentArea: "platform" },
-              { name: "renamed", applyTo: "lib/**" }
+              { name: "renamed", applyTo: "lib/**", parentArea: "platform" }
             ]
           }
         ]
@@ -657,9 +657,13 @@ describe("analyzeRepo", () => {
     expect(result.areas).toHaveLength(4);
     expect(result.areas).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ name: "renamed", applyTo: ["src/**"] }),
+        expect.objectContaining({ name: "renamed", applyTo: ["src/**"], parentArea: undefined }),
         expect.objectContaining({ name: "api", parentArea: "renamed" }),
-        expect.objectContaining({ name: "product/renamed", applyTo: "packages/lib/**" }),
+        expect.objectContaining({
+          name: "product/renamed",
+          applyTo: "packages/lib/**",
+          parentArea: undefined
+        }),
         expect.objectContaining({ name: "product/child", parentArea: "product/renamed" })
       ])
     );
